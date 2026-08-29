@@ -40,8 +40,9 @@ type editor struct {
 	copyOnSave    *gtk.CheckButton
 	undoButton    *gtk.Button
 	redoButton    *gtk.Button
-	sizeScale     *gtk.Scale
+	stroke        *strokeControl
 	tools         *toolSwitcher
+	colors        *colorSwitcher
 	doc           *annotate.Document
 	path          string
 	surface       *cairo.Surface
@@ -149,41 +150,34 @@ func (e *editor) build() {
 	save.ConnectClicked(e.save)
 	header.PackEnd(save)
 
-	root := gtk.NewBox(gtk.OrientationVertical, 10)
-	root.SetMarginTop(12)
-	root.SetMarginBottom(12)
-	root.SetMarginStart(12)
-	root.SetMarginEnd(12)
+	root := gtk.NewBox(gtk.OrientationVertical, 14)
+	root.SetMarginTop(16)
+	root.SetMarginBottom(16)
+	root.SetMarginStart(16)
+	root.SetMarginEnd(16)
 
-	tools := gtk.NewBox(gtk.OrientationHorizontal, 2)
-	e.tools = appendToolToggles(tools, editorTools(), e.tool, e.setTool)
+	tools := gtk.NewBox(gtk.OrientationHorizontal, 0)
+	tools.SetCSSClasses([]string{"linked", "lamha-editor-chrome"})
+	e.tools = appendToolToggles(tools, editorTools(), e.tool, iconInkOnLight, e.setTool)
 	root.Append(tools)
 
-	options := gtk.NewBox(gtk.OrientationHorizontal, 8)
-	for i, swatch := range editorColors {
-		i := i
-		options.Append(newColorSwatch(withKey(colorName(swatch.name), colorID(i)), swatch.color, func(annotate.Color) {
-			e.setColorIndex(i)
-		}))
-	}
+	options := gtk.NewBox(gtk.OrientationHorizontal, 12)
+	options.SetVAlign(gtk.AlignCenter)
+	e.colors = appendColorSwatches(options, 0, e.setColorIndex)
 
-	options.Append(gtk.NewLabel(i18n.T("Size")))
-	e.sizeScale = gtk.NewScaleWithRange(gtk.OrientationHorizontal, 2, 28, 1)
-	e.sizeScale.SetDrawValue(true)
-	e.sizeScale.SetValue(e.width)
-	e.sizeScale.SetSizeRequest(140, -1)
-	e.sizeScale.ConnectValueChanged(func() {
-		e.setWidth(e.sizeScale.Value())
-	})
-	options.Append(e.sizeScale)
+	e.stroke = newStrokeControl(e.width, false, false, strokeWidthTip(), e.setWidth)
+	e.stroke.box.SetHExpand(true)
+	options.Append(e.stroke.box)
 
 	e.copyOnSave = gtk.NewCheckButtonWithLabel(i18n.T("Also copy to clipboard when saving"))
 	e.copyOnSave.SetActive(true)
+	e.copyOnSave.SetHAlign(gtk.AlignEnd)
 	options.Append(e.copyOnSave)
 	root.Append(options)
 
 	e.status = gtk.NewLabel(i18n.T("Click a mark to move or restyle it. Double-click text to edit. Scroll resizes the lens. Shortcuts are editable in the main window."))
 	alignStart(e.status)
+	e.status.SetWrap(true)
 	e.status.SetCSSClasses([]string{"dim-label"})
 	root.Append(e.status)
 
@@ -215,11 +209,10 @@ func (e *editor) build() {
 	e.lens.setSize(e.magnifierSize)
 	e.lens.attach(e.host)
 
-	frame := gtk.NewFrame("")
-	frame.SetHExpand(true)
-	frame.SetVExpand(true)
-	frame.SetChild(e.host)
-	root.Append(frame)
+	e.host.SetCSSClasses([]string{"lamha-canvas-host"})
+	e.host.SetHExpand(true)
+	e.host.SetVExpand(true)
+	root.Append(e.host)
 
 	e.window.SetChild(root)
 }
@@ -239,6 +232,9 @@ func (e *editor) bindGestures() {
 		point := e.view.ToImage(x, y)
 		if e.tool == annotate.ToolSelect || e.tool == annotate.ToolMove {
 			e.selected = e.doc.Hit(point)
+			if stroke, ok := e.doc.Stroke(e.selected); ok {
+				e.adoptStroke(stroke)
+			}
 			e.refreshActions()
 			e.canvas.QueueDraw()
 			return
@@ -284,6 +280,9 @@ func (e *editor) bindGestures() {
 		if e.tool == annotate.ToolSelect || e.tool == annotate.ToolMove {
 			if hit := e.doc.Hit(start); hit >= 0 {
 				e.selected = hit
+				if stroke, ok := e.doc.Stroke(hit); ok {
+					e.adoptStroke(stroke)
+				}
 				e.moving = true
 				e.moveLast = start
 				e.draft = nil
@@ -560,10 +559,7 @@ func (e *editor) beginTextEdit(point annotate.Point) bool {
 	e.commitTyping()
 	e.selected = hit
 	e.color = stroke.Color
-	e.width = stroke.Width
-	if e.sizeScale != nil && e.sizeScale.Value() != e.width {
-		e.sizeScale.SetValue(e.width)
-	}
+	e.adoptStroke(stroke)
 	e.text.beginReplace(e.host, e.view, stroke, hit, func() {
 		e.selected = applyTextCommit(e.doc, &e.text)
 		e.refreshSurface()
@@ -605,6 +601,9 @@ func (e *editor) setColorIndex(index int) {
 		return
 	}
 	e.color = editorColors[index].color
+	if e.colors != nil {
+		e.colors.activate(index)
+	}
 	if e.text.active() {
 		e.text.draft.color = e.color
 		e.canvas.QueueDraw()
@@ -617,17 +616,15 @@ func (e *editor) setColorIndex(index int) {
 	}
 }
 
+func (e *editor) adoptStroke(stroke annotate.Stroke) {
+	e.width = clampStroke(stroke.Width)
+	e.stroke.SetValue(e.width)
+}
+
 func (e *editor) setWidth(width float64) {
-	if width < 2 {
-		width = 2
-	}
-	if width > 28 {
-		width = 28
-	}
+	width = clampStroke(width)
 	e.width = width
-	if e.sizeScale != nil && e.sizeScale.Value() != width {
-		e.sizeScale.SetValue(width)
-	}
+	e.stroke.SetValue(width)
 	if e.text.active() {
 		e.text.draft.width = width
 		e.canvas.QueueDraw()
@@ -761,5 +758,14 @@ func copyImageFile(path string) error {
 		return fmt.Errorf("no display is available for the clipboard")
 	}
 	display.Clipboard().SetTexture(texture)
+	return nil
+}
+
+func copyText(text string) error {
+	display := gdk.DisplayGetDefault()
+	if display == nil {
+		return fmt.Errorf("no display is available for the clipboard")
+	}
+	display.Clipboard().SetText(text)
 	return nil
 }

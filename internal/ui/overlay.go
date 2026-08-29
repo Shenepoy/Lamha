@@ -3,7 +3,6 @@ package ui
 import (
 	"image"
 	"os"
-	"time"
 
 	"github.com/diamondburned/gotk4/pkg/cairo"
 	"github.com/diamondburned/gotk4/pkg/core/glib"
@@ -24,8 +23,9 @@ type captureOverlay struct {
 	copyOnSave    *gtk.ToggleButton
 	undoButton    *gtk.Button
 	redoButton    *gtk.Button
-	sizeScale     *gtk.Scale
+	stroke        *strokeControl
 	tools         *toolSwitcher
+	colors        *colorSwitcher
 	doc           *annotate.Document
 	staging       string
 	mode          CaptureMode
@@ -85,15 +85,13 @@ func (w *Window) openCaptureOverlay(mode CaptureMode, staging string) {
 
 	width, height, monitor := displayBounds(w.window)
 	ov.coverMonitor(width, height)
-	ov.window.SetOpacity(0)
 	if monitor != nil {
 		ov.window.FullscreenOnMonitor(monitor)
 	} else {
 		ov.window.Fullscreen()
 	}
-	w.window.SetVisible(false)
 	ov.window.Present()
-	fadeWindow(ov.window, 0, 1, 160, nil)
+	w.window.SetVisible(false)
 }
 
 func (o *captureOverlay) build() {
@@ -180,25 +178,15 @@ func (o *captureOverlay) buildChrome() *gtk.Box {
 	chrome.SetCSSClasses([]string{"lamha-toolbar"})
 
 	tools := gtk.NewBox(gtk.OrientationHorizontal, 2)
-	o.tools = appendToolToggles(tools, captureTools(), o.tool, o.setTool)
+	o.tools = appendToolToggles(tools, captureTools(), o.tool, iconInkOnDark, o.setTool)
 	chrome.Append(tools)
 
 	chrome.Append(gtk.NewSeparator(gtk.OrientationVertical))
 
-	for i, swatch := range editorColors {
-		i := i
-		chrome.Append(newColorSwatch(withKey(colorName(swatch.name), colorID(i)), swatch.color, func(annotate.Color) {
-			o.setColorIndex(i)
-		}))
-	}
+	o.colors = appendColorSwatches(chrome, 0, o.setColorIndex)
 
-	o.sizeScale = gtk.NewScaleWithRange(gtk.OrientationHorizontal, 2, 28, 1)
-	o.sizeScale.SetDrawValue(false)
-	o.sizeScale.SetValue(o.width)
-	o.sizeScale.SetSizeRequest(96, -1)
-	o.sizeScale.SetTooltipText(withKey(i18n.T("Smaller / larger brush"), keys.WidthDown) + " / " + accelLabel(keys.Current().Accel(keys.WidthUp)))
-	o.sizeScale.ConnectValueChanged(func() { o.setWidth(o.sizeScale.Value()) })
-	chrome.Append(o.sizeScale)
+	o.stroke = newStrokeControl(o.width, true, true, strokeWidthTip(), o.setWidth)
+	chrome.Append(o.stroke.box)
 
 	o.undoButton = newIconButton("edit-undo-symbolic", withKey(i18n.T("Undo"), keys.Undo))
 	o.undoButton.SetSensitive(false)
@@ -268,6 +256,9 @@ func (o *captureOverlay) bindGestures() {
 		point := o.view.ToImage(x, y)
 		if o.tool == annotate.ToolSelect || o.tool == annotate.ToolMove {
 			o.selected = o.doc.Hit(point)
+			if stroke, ok := o.doc.Stroke(o.selected); ok {
+				o.adoptStroke(stroke)
+			}
 			o.refreshActions()
 			o.canvas.QueueDraw()
 			return
@@ -313,6 +304,9 @@ func (o *captureOverlay) bindGestures() {
 		if o.tool == annotate.ToolSelect || o.tool == annotate.ToolMove {
 			if hit := o.doc.Hit(start); hit >= 0 {
 				o.selected = hit
+				if stroke, ok := o.doc.Stroke(hit); ok {
+					o.adoptStroke(stroke)
+				}
 				o.moving = true
 				o.moveLast = start
 				o.selecting = false
@@ -570,10 +564,7 @@ func (o *captureOverlay) beginTextEdit(point annotate.Point) bool {
 	o.commitTyping()
 	o.selected = hit
 	o.color = stroke.Color
-	o.width = stroke.Width
-	if o.sizeScale != nil && o.sizeScale.Value() != o.width {
-		o.sizeScale.SetValue(o.width)
-	}
+	o.adoptStroke(stroke)
 	o.text.beginReplace(o.host, o.view, stroke, hit, func() {
 		o.selected = applyTextCommit(o.doc, &o.text)
 		o.refreshSurface()
@@ -615,6 +606,9 @@ func (o *captureOverlay) setColorIndex(index int) {
 		return
 	}
 	o.color = editorColors[index].color
+	if o.colors != nil {
+		o.colors.activate(index)
+	}
 	if o.text.active() {
 		o.text.draft.color = o.color
 		o.canvas.QueueDraw()
@@ -627,17 +621,15 @@ func (o *captureOverlay) setColorIndex(index int) {
 	}
 }
 
+func (o *captureOverlay) adoptStroke(stroke annotate.Stroke) {
+	o.width = clampStroke(stroke.Width)
+	o.stroke.SetValue(o.width)
+}
+
 func (o *captureOverlay) setWidth(width float64) {
-	if width < 2 {
-		width = 2
-	}
-	if width > 28 {
-		width = 28
-	}
+	width = clampStroke(width)
 	o.width = width
-	if o.sizeScale != nil && o.sizeScale.Value() != width {
-		o.sizeScale.SetValue(width)
-	}
+	o.stroke.SetValue(width)
 	if o.text.active() {
 		o.text.draft.width = width
 		o.canvas.QueueDraw()
@@ -811,13 +803,10 @@ func (o *captureOverlay) dismiss(after func()) {
 		}
 		return
 	}
-	win.SetSensitive(false)
-	fadeWindow(win, win.Opacity(), 0, 200, func() {
-		win.Destroy()
-		if after != nil {
-			after()
-		}
-	})
+	win.Destroy()
+	if after != nil {
+		after()
+	}
 }
 
 func (o *captureOverlay) coverMonitor(width, height int) {
@@ -829,35 +818,6 @@ func (o *captureOverlay) coverMonitor(width, height int) {
 		width, height = 1920, 1080
 	}
 	o.window.SetDefaultSize(width, height)
-	o.window.SetSizeRequest(width, height)
-	o.canvas.SetContentWidth(width)
-	o.canvas.SetContentHeight(height)
-	o.canvas.SetSizeRequest(width, height)
-}
-
-func fadeWindow(win *gtk.Window, from, to float64, ms uint, done func()) {
-	if win == nil {
-		if done != nil {
-			done()
-		}
-		return
-	}
-	win.SetOpacity(from)
-	started := time.Now()
-	dur := time.Duration(ms) * time.Millisecond
-	glib.TimeoutAdd(16, func() bool {
-		t := float64(time.Since(started)) / float64(dur)
-		if t >= 1 {
-			win.SetOpacity(to)
-			if done != nil {
-				done()
-			}
-			return false
-		}
-		ease := t * t * (3 - 2*t)
-		win.SetOpacity(from + (to-from)*ease)
-		return true
-	})
 }
 
 func displayBounds(win *gtk.ApplicationWindow) (int, int, *gdk.Monitor) {

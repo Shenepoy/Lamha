@@ -20,7 +20,7 @@ func TestLanguageIsArabic(t *testing.T) {
 }
 
 func TestArabicMessagesCoverCommonUI(t *testing.T) {
-	for _, key := range []string{"Move marks", "Pen", "Arrow", "Ellipse", "Text", "Capture area"} {
+	for _, key := range []string{"Move marks", "Pen", "Arrow", "Ellipse", "Text", "Capture area", "Area", "Recent", "Main menu", "Copy path", "Delete"} {
 		if arabicMessages[key] == "" {
 			t.Fatalf("missing Arabic for %q", key)
 		}

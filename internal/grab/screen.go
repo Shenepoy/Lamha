@@ -108,14 +108,15 @@ func fastBackends() []backend {
 	desktop := strings.ToLower(os.Getenv("XDG_CURRENT_DESKTOP") + ":" + os.Getenv("DESKTOP_SESSION"))
 	gnome := []backend{
 		{name: "GNOME Shell", grab: gnomeShellScreenshot},
-		{name: "gnome-screenshot", grab: gnomeScreenshotCLI},
-		{name: "KWin", grab: kwinScreenshot},
-		{name: "Spectacle", grab: spectacleScreenshot},
+	}
+	if _, err := exec.LookPath("gnome-screenshot"); err == nil {
+		gnome = append(gnome, backend{name: "gnome-screenshot", grab: gnomeScreenshotCLI})
 	}
 	plasma := []backend{
 		{name: "KWin", grab: kwinScreenshot},
-		{name: "Spectacle", grab: spectacleScreenshot},
-		{name: "GNOME Shell", grab: gnomeShellScreenshot},
+	}
+	if _, err := exec.LookPath("spectacle"); err == nil {
+		plasma = append(plasma, backend{name: "Spectacle", grab: spectacleScreenshot})
 	}
 	if strings.Contains(desktop, "kde") || strings.Contains(desktop, "plasma") {
 		return plasma

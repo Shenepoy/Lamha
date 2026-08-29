@@ -62,14 +62,43 @@ func ensureToolbarCSS() {
 .lamha-toolbar scale trough {
   background-color: alpha(white, 0.25);
 }
+.lamha-toolbar spinbutton {
+  min-width: 54px;
+  min-height: 28px;
+  color: white;
+}
 .lamha-toolbar .dim-label {
   color: alpha(white, 0.85);
 }
+.lamha-stroke-preview {
+  min-width: 36px;
+  min-height: 22px;
+}
 .lamha-swatch {
-  min-width: 28px;
-  min-height: 28px;
-  padding: 2px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 3px;
   border-radius: 999px;
+}
+.lamha-swatch:hover {
+  background-color: alpha(currentColor, 0.08);
+}
+.lamha-editor-chrome button {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px;
+  border-radius: 8px;
+}
+.lamha-editor-chrome button:hover {
+  background-color: alpha(currentColor, 0.08);
+}
+.lamha-editor-chrome button:checked,
+.lamha-editor-chrome button:active {
+  background-color: alpha(#3584e4, 0.18);
+}
+.lamha-canvas-host {
+  border-radius: 12px;
+  border: 1px solid alpha(currentColor, 0.14);
 }
 .lamha-lens,
 .lamha-lens-layer {
@@ -114,22 +143,107 @@ func newIconToggle(icon, tip string) *gtk.ToggleButton {
 	return button
 }
 
-func newColorSwatch(name string, color annotate.Color, onPick func(annotate.Color)) *gtk.Button {
-	swatch := gtk.NewDrawingArea()
-	swatch.SetSizeRequest(16, 16)
-	swatch.SetDrawFunc(func(_ *gtk.DrawingArea, cr *cairo.Context, width, height int) {
-		cr.SetSourceRGB(float64(color.R)/255, float64(color.G)/255, float64(color.B)/255)
-		cr.Arc(float64(width)/2, float64(height)/2, float64(min(width, height))/2-1, 0, 6.28318)
-		cr.Fill()
-	})
+type colorSwitcher struct {
+	selected int
+	updating bool
+	areas    []*gtk.DrawingArea
+	buttons  []*gtk.ToggleButton
+}
 
-	button := gtk.NewButton()
-	button.SetChild(swatch)
-	button.SetTooltipText(name)
-	button.SetHasFrame(false)
-	button.SetCSSClasses([]string{"lamha-swatch"})
-	button.ConnectClicked(func() { onPick(color) })
-	return button
+func (s *colorSwitcher) activate(index int) {
+	if s == nil || index < 0 || index >= len(s.buttons) {
+		return
+	}
+	if s.updating {
+		return
+	}
+	s.updating = true
+	s.selected = index
+	for i, button := range s.buttons {
+		if button.Active() != (i == index) {
+			button.SetActive(i == index)
+		}
+		s.areas[i].QueueDraw()
+	}
+	s.updating = false
+}
+
+func appendColorSwatches(box *gtk.Box, active int, onPick func(int)) *colorSwitcher {
+	switcher := &colorSwitcher{selected: active}
+	var group *gtk.ToggleButton
+	for i, item := range editorColors {
+		i := i
+		item := item
+		area := gtk.NewDrawingArea()
+		area.SetSizeRequest(22, 22)
+		area.SetContentWidth(22)
+		area.SetContentHeight(22)
+		area.SetDrawFunc(func(_ *gtk.DrawingArea, cr *cairo.Context, width, height int) {
+			drawColorSwatch(cr, item.color, switcher.selected == i, width, height)
+		})
+
+		button := gtk.NewToggleButton()
+		button.SetChild(area)
+		button.SetTooltipText(withKey(colorName(item.name), colorID(i)))
+		button.SetHasFrame(false)
+		button.SetCSSClasses([]string{"lamha-swatch"})
+		if group == nil {
+			group = button
+		} else {
+			button.SetGroup(group)
+		}
+		button.SetActive(i == active)
+		button.ConnectToggled(func() {
+			if button.Active() {
+				onPick(i)
+			}
+		})
+		switcher.areas = append(switcher.areas, area)
+		switcher.buttons = append(switcher.buttons, button)
+		box.Append(button)
+	}
+	return switcher
+}
+
+func swatchBorderKind(color annotate.Color) string {
+	luma := (0.299*float64(color.R) + 0.587*float64(color.G) + 0.114*float64(color.B)) / 255
+	switch {
+	case luma > 0.72:
+		return "dark"
+	case luma < 0.18:
+		return "light"
+	default:
+		return "neutral"
+	}
+}
+
+func drawColorSwatch(cr *cairo.Context, color annotate.Color, selected bool, width, height int) {
+	cx := float64(width) / 2
+	cy := float64(height) / 2
+	radius := min(cx, cy) - 3.6
+
+	cr.SetSourceRGB(float64(color.R)/255, float64(color.G)/255, float64(color.B)/255)
+	cr.Arc(cx, cy, radius, 0, 6.283185307179586)
+	cr.Fill()
+
+	switch swatchBorderKind(color) {
+	case "dark":
+		cr.SetSourceRGB(0.22, 0.23, 0.26)
+	case "light":
+		cr.SetSourceRGB(0.64, 0.66, 0.70)
+	default:
+		cr.SetSourceRGBA(0, 0, 0, 0.38)
+	}
+	cr.SetLineWidth(1.3)
+	cr.Arc(cx, cy, radius, 0, 6.283185307179586)
+	cr.Stroke()
+
+	if selected {
+		cr.SetSourceRGB(0.26, 0.51, 0.96)
+		cr.SetLineWidth(2.2)
+		cr.Arc(cx, cy, radius+2.5, 0, 6.283185307179586)
+		cr.Stroke()
+	}
 }
 
 type toolSwitcher struct {
@@ -145,12 +259,12 @@ func (s *toolSwitcher) activate(tool annotate.Tool) {
 	}
 }
 
-func appendToolToggles(box *gtk.Box, tools []toolItem, active annotate.Tool, onPick func(annotate.Tool)) *toolSwitcher {
+func appendToolToggles(box *gtk.Box, tools []toolItem, active annotate.Tool, ink iconInk, onPick func(annotate.Tool)) *toolSwitcher {
 	switcher := &toolSwitcher{buttons: map[annotate.Tool]*gtk.ToggleButton{}}
 	var group *gtk.ToggleButton
 	for _, item := range tools {
 		item := item
-		button := newDrawnToggle(toolIcon(item.tool), item.tip)
+		button := newDrawnToggle(toolIcon(item.tool), item.tip, ink)
 		if group == nil {
 			group = button
 		} else {

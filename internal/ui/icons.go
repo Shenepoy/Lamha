@@ -10,26 +10,43 @@ import (
 	"github.com/lamha-app/lamha/internal/i18n"
 )
 
-type iconDraw func(cr *cairo.Context, w, h float64)
+type iconInk struct {
+	r, g, b float64
+}
 
-func newIconCanvas(draw iconDraw) *gtk.DrawingArea {
+var (
+	iconInkOnDark  = iconInk{1, 1, 1}
+	iconInkOnLight = iconInk{0.13, 0.14, 0.16}
+)
+
+func (ink iconInk) apply(cr *cairo.Context) {
+	cr.SetSourceRGB(ink.r, ink.g, ink.b)
+}
+
+func (ink iconInk) onDark() bool {
+	return ink.r > 0.5
+}
+
+type iconDraw func(cr *cairo.Context, w, h float64, ink iconInk)
+
+func newIconCanvas(draw iconDraw, ink iconInk) *gtk.DrawingArea {
 	area := gtk.NewDrawingArea()
 	area.SetSizeRequest(28, 28)
 	area.SetContentWidth(28)
 	area.SetContentHeight(28)
 	area.SetDrawFunc(func(_ *gtk.DrawingArea, cr *cairo.Context, width, height int) {
-		cr.SetSourceRGB(1, 1, 1)
 		cr.SetLineWidth(1.7)
 		cr.SetLineCap(cairo.LineCapRound)
 		cr.SetLineJoin(cairo.LineJoinRound)
-		draw(cr, float64(width), float64(height))
+		ink.apply(cr)
+		draw(cr, float64(width), float64(height), ink)
 	})
 	return area
 }
 
-func newDrawnToggle(draw iconDraw, tip string) *gtk.ToggleButton {
+func newDrawnToggle(draw iconDraw, tip string, ink iconInk) *gtk.ToggleButton {
 	button := gtk.NewToggleButton()
-	button.SetChild(newIconCanvas(draw))
+	button.SetChild(newIconCanvas(draw, ink))
 	button.SetTooltipText(tip)
 	button.SetHasFrame(false)
 	return button
@@ -40,7 +57,8 @@ func iconBox(w, h float64) (x, y, s float64) {
 	return pad, pad, math.Min(w, h) - 2*pad
 }
 
-func iconSelect(cr *cairo.Context, w, h float64) {
+func iconSelect(cr *cairo.Context, w, h float64, ink iconInk) {
+	ink.apply(cr)
 	x, y, s := iconBox(w, h)
 	cr.SetDash([]float64{3.2, 2.4}, 0)
 	cr.Rectangle(x+0.5, y+0.5, s-1, s-1)
@@ -48,7 +66,8 @@ func iconSelect(cr *cairo.Context, w, h float64) {
 	cr.SetDash(nil, 0)
 }
 
-func iconMove(cr *cairo.Context, w, h float64) {
+func iconMove(cr *cairo.Context, w, h float64, ink iconInk) {
+	ink.apply(cr)
 	cx, cy := w/2, h/2
 	_, _, s := iconBox(w, h)
 	arm := s * 0.46
@@ -73,7 +92,8 @@ func arrow(cr *cairo.Context, x, y, dx, dy, size float64) {
 	cr.Fill()
 }
 
-func iconPen(cr *cairo.Context, w, h float64) {
+func iconPen(cr *cairo.Context, w, h float64, ink iconInk) {
+	ink.apply(cr)
 	x, y, s := iconBox(w, h)
 	cr.MoveTo(x+s*0.18, y+s*0.82)
 	cr.LineTo(x+s*0.72, y+s*0.28)
@@ -88,7 +108,8 @@ func iconPen(cr *cairo.Context, w, h float64) {
 	cr.Fill()
 }
 
-func iconArrow(cr *cairo.Context, w, h float64) {
+func iconArrow(cr *cairo.Context, w, h float64, ink iconInk) {
+	ink.apply(cr)
 	x, y, s := iconBox(w, h)
 	cr.MoveTo(x+s*0.12, y+s*0.78)
 	cr.LineTo(x+s*0.62, y+s*0.28)
@@ -96,13 +117,15 @@ func iconArrow(cr *cairo.Context, w, h float64) {
 	arrow(cr, x+s*0.78, y+s*0.16, 0.75, -0.66, s*0.28)
 }
 
-func iconRect(cr *cairo.Context, w, h float64) {
+func iconRect(cr *cairo.Context, w, h float64, ink iconInk) {
+	ink.apply(cr)
 	x, y, s := iconBox(w, h)
 	cr.Rectangle(x+0.5, y+s*0.12, s-1, s*0.76)
 	cr.Stroke()
 }
 
-func iconEllipse(cr *cairo.Context, w, h float64) {
+func iconEllipse(cr *cairo.Context, w, h float64, ink iconInk) {
+	ink.apply(cr)
 	x, y, s := iconBox(w, h)
 	cr.Save()
 	cr.Translate(x+s/2, y+s/2)
@@ -112,7 +135,8 @@ func iconEllipse(cr *cairo.Context, w, h float64) {
 	cr.Stroke()
 }
 
-func iconHighlight(cr *cairo.Context, w, h float64) {
+func iconHighlight(cr *cairo.Context, w, h float64, ink iconInk) {
+	ink.apply(cr)
 	x, y, s := iconBox(w, h)
 	cr.SetLineWidth(s * 0.28)
 	cr.MoveTo(x+s*0.08, y+s*0.72)
@@ -126,23 +150,30 @@ func iconHighlight(cr *cairo.Context, w, h float64) {
 	cr.Fill()
 }
 
-func iconBlur(cr *cairo.Context, w, h float64) {
+func iconBlur(cr *cairo.Context, w, h float64, ink iconInk) {
 	x, y, s := iconBox(w, h)
 	cell := s / 3
 	for row := 0; row < 3; row++ {
 		for col := 0; col < 3; col++ {
-			shade := 0.45 + 0.18*float64((row+col)%3)
+			step := float64((row + col) % 3)
+			var shade float64
+			if ink.onDark() {
+				shade = 0.45 + 0.18*step
+			} else {
+				shade = 0.22 + 0.16*step
+			}
 			cr.SetSourceRGB(shade, shade, shade)
 			cr.Rectangle(x+float64(col)*cell+0.6, y+float64(row)*cell+0.6, cell-1.2, cell-1.2)
 			cr.Fill()
 		}
 	}
-	cr.SetSourceRGB(1, 1, 1)
+	ink.apply(cr)
 	cr.Rectangle(x+0.5, y+0.5, s-1, s-1)
 	cr.Stroke()
 }
 
-func iconSteps(cr *cairo.Context, w, h float64) {
+func iconSteps(cr *cairo.Context, w, h float64, ink iconInk) {
+	ink.apply(cr)
 	x, y, s := iconBox(w, h)
 	cr.Arc(x+s/2, y+s/2, s*0.46, 0, 2*math.Pi)
 	cr.Stroke()
@@ -152,7 +183,8 @@ func iconSteps(cr *cairo.Context, w, h float64) {
 	cr.ShowText("1")
 }
 
-func iconText(cr *cairo.Context, w, h float64) {
+func iconText(cr *cairo.Context, w, h float64, ink iconInk) {
+	ink.apply(cr)
 	x, y, s := iconBox(w, h)
 	glyph := "A"
 	if i18n.Arabic() {
@@ -164,7 +196,8 @@ func iconText(cr *cairo.Context, w, h float64) {
 	cr.ShowText(glyph)
 }
 
-func iconEraser(cr *cairo.Context, w, h float64) {
+func iconEraser(cr *cairo.Context, w, h float64, ink iconInk) {
+	ink.apply(cr)
 	x, y, s := iconBox(w, h)
 	cr.MoveTo(x+s*0.18, y+s*0.42)
 	cr.LineTo(x+s*0.52, y+s*0.08)
@@ -180,7 +213,8 @@ func iconEraser(cr *cairo.Context, w, h float64) {
 	cr.Stroke()
 }
 
-func iconAreaErase(cr *cairo.Context, w, h float64) {
+func iconAreaErase(cr *cairo.Context, w, h float64, ink iconInk) {
+	ink.apply(cr)
 	x, y, s := iconBox(w, h)
 	cr.SetDash([]float64{2.6, 2.0}, 0)
 	cr.Rectangle(x+0.5, y+0.5, s*0.72, s*0.72)

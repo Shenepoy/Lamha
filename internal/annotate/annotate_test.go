@@ -76,6 +76,24 @@ func TestMagicEraseRemovesSpot(t *testing.T) {
 	}
 }
 
+func TestMagicEraseRectFillsInterior(t *testing.T) {
+	doc := solidDoc(40, 40, color.NRGBA{R: 0, G: 180, B: 0, A: 255})
+	for y := 10; y < 30; y++ {
+		for x := 10; x < 30; x++ {
+			doc.source.SetNRGBA(x, y, color.NRGBA{R: 255, G: 0, B: 0, A: 255})
+		}
+	}
+	doc.Add(Stroke{Tool: ToolAreaErase, X1: 10, Y1: 10, X2: 29, Y2: 29})
+	out := doc.Render()
+	center := out.NRGBAAt(20, 20)
+	if center.R > 80 {
+		t.Fatalf("area erase left the interior: %+v", center)
+	}
+	if center.G < 80 {
+		t.Fatalf("area erase center = %+v, want surrounding green", center)
+	}
+}
+
 func TestStepNumbersAdvance(t *testing.T) {
 	doc := solidDoc(40, 40, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
 	if doc.NextStep() != 1 {

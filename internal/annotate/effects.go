@@ -85,42 +85,113 @@ func magicEraseRect(dst *image.NRGBA, region image.Rectangle) {
 	if region.Empty() {
 		return
 	}
+	src := cloneNRGBA(dst)
 	bounds := dst.Bounds()
-	w, h := bounds.Dx(), bounds.Dy()
-	mask := make([]bool, w*h)
 	for y := region.Min.Y; y < region.Max.Y; y++ {
 		for x := region.Min.X; x < region.Max.X; x++ {
-			mask[y*w+x] = true
-		}
-	}
-	fillMasked(dst, mask, w, h, region.Min.X, region.Min.Y, region.Max.X-1, region.Max.Y-1, math.Max(12, float64(max(region.Dx(), region.Dy()))*0.08))
-}
-
-func fillMasked(dst *image.NRGBA, mask []bool, w, h, minX, minY, maxX, maxY int, windowF float64) {
-	src := cloneNRGBA(dst)
-	window := int(math.Max(10, windowF))
-	for y := minY; y <= maxY; y++ {
-		for x := minX; x <= maxX; x++ {
-			if !mask[y*w+x] {
-				continue
-			}
-			var r, g, b, n int
-			for yy := y - window; yy <= y+window; yy++ {
-				for xx := x - window; xx <= x+window; xx++ {
-					if xx < 0 || yy < 0 || xx >= w || yy >= h || mask[yy*w+xx] {
-						continue
-					}
-					c := src.NRGBAAt(xx, yy)
-					r += int(c.R)
-					g += int(c.G)
-					b += int(c.B)
-					n++
+			var r, g, b, n float64
+			add := func(px, py int, weight float64) {
+				if weight <= 0 || !image.Pt(px, py).In(bounds) {
+					return
 				}
+				c := src.NRGBAAt(px, py)
+				r += float64(c.R) * weight
+				g += float64(c.G) * weight
+				b += float64(c.B) * weight
+				n += weight
+			}
+			for i := 1; i <= 4; i++ {
+				fi := float64(i)
+				add(region.Min.X-i, y, 1/math.Max(1, float64(x-region.Min.X)+fi))
+				add(region.Max.X-1+i, y, 1/math.Max(1, float64(region.Max.X-1+i-x)))
+				add(x, region.Min.Y-i, 1/math.Max(1, float64(y-region.Min.Y)+fi))
+				add(x, region.Max.Y-1+i, 1/math.Max(1, float64(region.Max.Y-1+i-y)))
 			}
 			if n == 0 {
 				continue
 			}
-			dst.SetNRGBA(x, y, color.NRGBA{R: uint8(r / n), G: uint8(g / n), B: uint8(b / n), A: 255})
+			dst.SetNRGBA(x, y, color.NRGBA{
+				R: uint8(math.Round(r / n)),
+				G: uint8(math.Round(g / n)),
+				B: uint8(math.Round(b / n)),
+				A: 255,
+			})
+		}
+	}
+}
+
+func fillMasked(dst *image.NRGBA, mask []bool, w, h, minX, minY, maxX, maxY int, _ float64) {
+	if maxX < minX || maxY < minY {
+		return
+	}
+	minX = clampInt(minX, 0, w-1)
+	maxX = clampInt(maxX, 0, w-1)
+	minY = clampInt(minY, 0, h-1)
+	maxY = clampInt(maxY, 0, h-1)
+
+	done := make([]bool, w*h)
+	for i, marked := range mask {
+		if !marked {
+			done[i] = true
+		}
+	}
+
+	dirs := [...][2]int{{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}}
+	type pix struct{ x, y int }
+	queue := make([]pix, 0, 64)
+	queued := make([]bool, w*h)
+	enqueue := func(x, y int) {
+		if x < minX || y < minY || x > maxX || y > maxY {
+			return
+		}
+		idx := y*w + x
+		if !mask[idx] || done[idx] || queued[idx] {
+			return
+		}
+		queued[idx] = true
+		queue = append(queue, pix{x, y})
+	}
+	hasDoneNeighbor := func(x, y int) bool {
+		for _, d := range dirs {
+			nx, ny := x+d[0], y+d[1]
+			if nx >= 0 && ny >= 0 && nx < w && ny < h && done[ny*w+nx] {
+				return true
+			}
+		}
+		return false
+	}
+	for y := minY; y <= maxY; y++ {
+		for x := minX; x <= maxX; x++ {
+			if mask[y*w+x] && hasDoneNeighbor(x, y) {
+				enqueue(x, y)
+			}
+		}
+	}
+	for i := 0; i < len(queue); i++ {
+		x, y := queue[i].x, queue[i].y
+		idx := y*w + x
+		if done[idx] {
+			continue
+		}
+		var r, g, b, n int
+		for _, d := range dirs {
+			nx, ny := x+d[0], y+d[1]
+			if nx < 0 || ny < 0 || nx >= w || ny >= h || !done[ny*w+nx] {
+				continue
+			}
+			c := dst.NRGBAAt(nx, ny)
+			r += int(c.R)
+			g += int(c.G)
+			b += int(c.B)
+			n++
+		}
+		if n == 0 {
+			continue
+		}
+		dst.SetNRGBA(x, y, color.NRGBA{R: uint8(r / n), G: uint8(g / n), B: uint8(b / n), A: 255})
+		done[idx] = true
+		for _, d := range dirs {
+			enqueue(x+d[0], y+d[1])
 		}
 	}
 }

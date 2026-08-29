@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	_ "image/jpeg"
 	"image/png"
 	"io"
 	"net/url"
@@ -22,6 +23,9 @@ type SavedCapture struct {
 	Path      string
 	URI       string
 	CreatedAt time.Time
+	Width     int
+	Height    int
+	Bytes     int64
 }
 
 // Store owns Lamha's durable capture directory.
@@ -201,10 +205,14 @@ func (s *Store) List() ([]SavedCapture, error) {
 			continue
 		}
 		path := filepath.Join(s.directory, entry.Name())
+		width, height := probeImageSize(path)
 		captures = append(captures, SavedCapture{
 			Path:      path,
 			URI:       fileURI(path),
 			CreatedAt: info.ModTime(),
+			Width:     width,
+			Height:    height,
+			Bytes:     info.Size(),
 		})
 	}
 
@@ -215,6 +223,19 @@ func (s *Store) List() ([]SavedCapture, error) {
 		return captures[i].CreatedAt.After(captures[j].CreatedAt)
 	})
 	return captures, nil
+}
+
+func probeImageSize(path string) (int, int) {
+	file, err := os.Open(path)
+	if err != nil {
+		return 0, 0
+	}
+	defer file.Close()
+	cfg, _, err := image.DecodeConfig(file)
+	if err != nil {
+		return 0, 0
+	}
+	return cfg.Width, cfg.Height
 }
 
 func hasKnownImageExt(path string) bool {
