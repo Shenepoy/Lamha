@@ -1,0 +1,13 @@
+# conda-forge specs for a GTK 4.22 / GLib 2.86+ prefix built against old glibc.
+# Latest gtk4 linux-64 requires __glibc >= 2.28.
+gtk4>=4.22
+libglib>=2.86
+gdk-pixbuf
+librsvg
+gobject-introspection
+pkg-config
+cairo
+pango
+libgraphene
+adwaita-icon-theme
+hicolor-icon-theme

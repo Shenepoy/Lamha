@@ -93,8 +93,8 @@ Captures land in `$XDG_DATA_HOME/lamha/captures` (usually `~/.local/share/lamha/
 Tagged builds publish a Linux binary and an AppImage:
 
 - [Latest release](https://github.com/Zyzto/Lamha/releases/latest)
-- `lamha-YY.0M.MICRO-linux-x86_64` — standalone binary (needs GTK 4 on the host)
-- `Lamha-YY.0M.MICRO-x86_64.AppImage` — bundled GTK 4
+- `lamha-YY.0M.MICRO-linux-x86_64` — standalone binary (needs GTK 4.22+ / GLib 2.86+ on the host)
+- `Lamha-YY.0M.MICRO-x86_64.AppImage` — bundled GTK 4; needs glibc 2.35+ (Ubuntu 22.04, Fedora 36, Debian 12, and later)
 
 Mark the AppImage executable, then run it. Versions are calendar versions like Janan: `YY.0M.MICRO` (first August 2026 release is `26.08.0`). Tag `v26.08.0`. The number lives in `VERSION`.
 

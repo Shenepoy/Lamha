@@ -78,6 +78,15 @@ export APPIMAGE_EXTRACT_AND_RUN=1
 export DEPLOY_GTK_VERSION=4
 export PATH="$(dirname "$plugin"):$PATH"
 
+# linuxdeploy-plugin-gtk copies $libdir/gtk-4.0. GTK 4.20+ may omit that tree.
+gtk4_libdir="$(pkg-config --variable=libdir gtk4 2>/dev/null || true)"
+if [[ -n "$gtk4_libdir" ]]; then
+  export LD_GTK_LIBRARY_PATH="${LD_GTK_LIBRARY_PATH:-$gtk4_libdir}"
+  if [[ ! -d "$gtk4_libdir/gtk-4.0" ]]; then
+    mkdir -p "$gtk4_libdir/gtk-4.0" 2>/dev/null || sudo mkdir -p "$gtk4_libdir/gtk-4.0"
+  fi
+fi
+
 cd "$dist"
 "$linuxdeploy" \
   --appdir "$appdir" \

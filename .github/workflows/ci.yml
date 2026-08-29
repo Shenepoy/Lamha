@@ -59,3 +59,49 @@ jobs:
           name: lamha-linux-x86_64
           path: dist/lamha-*-linux-x86_64
           if-no-files-found: error
+
+  portable-appimage:
+    name: Portable AppImage
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install host toolchain
+        run: bash ./scripts/ci/install_portable_host.sh
+
+      - name: Cache conda GTK prefix
+        uses: actions/cache@v4
+        with:
+          path: .ci-gtk
+          key: portable-gtk-${{ runner.os }}-${{ hashFiles('scripts/ci/portable_gtk.txt') }}
+
+      - name: Portable GTK prefix
+        run: bash ./scripts/ci/portable_gtk.sh
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build AppImage
+        run: bash packaging/appimage/build.sh
+
+      - name: Check glibc baseline
+        run: |
+          bash ./scripts/ci/check_glibc.sh dist/Lamha.AppDir/usr/bin/lamha
+          found=0
+          while IFS= read -r so; do
+            found=1
+            bash ./scripts/ci/check_glibc.sh "$so"
+          done < <(find dist/Lamha.AppDir/usr/lib -maxdepth 1 \( -name 'libgtk-4.so.1' -o -name 'libglib-2.0.so.0' \))
+          test "$found" = 1
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: lamha-appimage
+          path: dist/Lamha-*-x86_64.AppImage
+          if-no-files-found: error
