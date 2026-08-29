@@ -48,15 +48,16 @@ if [[ ! -x "$pc" ]]; then
 fi
 
 # gtk4.pc Requires.private many modules whose conda runtime packages omit .pc files.
+pc_mods=(gtk4 glib-2.0 gobject-introspection-1.0)
 for _ in $(seq 1 25); do
-  if "$pc" --exists gtk4 glib-2.0 2>/dev/null; then
+  if "$pc" --exists "${pc_mods[@]}" 2>/dev/null; then
     break
   fi
-  err="$("$pc" --exists --print-errors gtk4 glib-2.0 2>&1 || true)"
+  err="$("$pc" --exists --print-errors "${pc_mods[@]}" 2>&1 || true)"
   echo "$err"
   missing="$(printf '%s\n' "$err" | sed -n "s/.*Package '\\([^']*\\)', required by.*/\\1/p" | head -n 1)"
   if [[ -z "$missing" ]]; then
-    echo "conda GTK prefix is missing gtk4 or glib-2.0 pkg-config files" >&2
+    echo "conda GTK prefix is missing required pkg-config modules" >&2
     exit 1
   fi
   echo "installing pkg-config module $missing"
@@ -64,8 +65,8 @@ for _ in $(seq 1 25); do
     "$MAMBA_BIN" install -y -p "$PREFIX" -c conda-forge "lib${missing}"
   fi
 done
-if ! "$pc" --exists --print-errors gtk4 glib-2.0; then
-  echo "conda GTK prefix is missing gtk4 or glib-2.0 pkg-config files" >&2
+if ! "$pc" --exists --print-errors "${pc_mods[@]}"; then
+  echo "conda GTK prefix is missing required pkg-config modules" >&2
   exit 1
 fi
 

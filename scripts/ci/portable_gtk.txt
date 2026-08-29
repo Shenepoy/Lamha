@@ -9,6 +9,7 @@ libpng
 freetype
 libffi
 pcre2
+gobject-introspection
 gdk-pixbuf
 librsvg
 pkgconf
