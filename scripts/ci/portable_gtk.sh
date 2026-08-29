@@ -30,17 +30,25 @@ if [[ ! -x "$PREFIX/bin/pkg-config" ]]; then
   "$MAMBA_BIN" create -y -p "$PREFIX" -c conda-forge "${specs[@]}"
 fi
 
+pc_path="$PREFIX/lib/pkgconfig:${PREFIX}/share/pkgconfig"
 export_var LAMHA_GTK_PREFIX "$PREFIX"
-export_var PKG_CONFIG_PATH "$PREFIX/lib/pkgconfig:${PREFIX}/share/pkgconfig"
+export_var PKG_CONFIG_PATH "$pc_path"
+export_var PKG_CONFIG_LIBDIR "$pc_path"
 export_var LD_LIBRARY_PATH "$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export_var LD_GTK_LIBRARY_PATH "$PREFIX/lib"
 export_var GI_TYPELIB_PATH "$PREFIX/lib/girepository-1.0"
 export_var XDG_DATA_DIRS "$PREFIX/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
 export_var PATH "$PREFIX/bin:$PATH"
 
-if ! pkg-config --exists gtk4 glib-2.0; then
+pc="$PREFIX/bin/pkg-config"
+if [[ ! -x "$pc" ]]; then
+  pc="$PREFIX/bin/pkgconf"
+fi
+if ! "$pc" --exists --print-errors gtk4 glib-2.0; then
   echo "conda GTK prefix is missing gtk4 or glib-2.0 pkg-config files" >&2
+  echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >&2
+  find "$PREFIX" -name '*.pc' -print >&2 || true
   exit 1
 fi
 
-echo "gtk4 $(pkg-config --modversion gtk4) glib $(pkg-config --modversion glib-2.0) prefix=$PREFIX"
+echo "gtk4 $($pc --modversion gtk4) glib $($pc --modversion glib-2.0) prefix=$PREFIX"

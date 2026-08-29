@@ -2,12 +2,15 @@
 # Latest gtk4 linux-64 requires __glibc >= 2.28.
 gtk4>=4.22
 libglib>=2.86
+glib
 gdk-pixbuf
 librsvg
-gobject-introspection
+pkgconf
 pkg-config
 cairo
 pango
 libgraphene
+epoxy
+wayland
 adwaita-icon-theme
 hicolor-icon-theme
