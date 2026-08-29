@@ -27,6 +27,11 @@ func Fast(ctx context.Context) (string, error) {
 	return runBackends(ctx, fastTimeout, fastBackends())
 }
 
+// Window tries compositor APIs that grab the focused window, not the whole screen.
+func Window(ctx context.Context) (string, error) {
+	return runBackends(ctx, fastTimeout, windowBackends())
+}
+
 // ViaPortal asks the screenshot portal. Silent requests do not show a picker.
 // Interactive is GNOME's one-time permission path and may show a system dialog.
 func ViaPortal(ctx context.Context, opts portal.ScreenshotOptions) (string, error) {
@@ -124,6 +129,26 @@ func fastBackends() []backend {
 	return gnome
 }
 
+func windowBackends() []backend {
+	desktop := strings.ToLower(os.Getenv("XDG_CURRENT_DESKTOP") + ":" + os.Getenv("DESKTOP_SESSION"))
+	gnome := []backend{
+		{name: "GNOME Shell window", grab: gnomeShellScreenshotWindow},
+	}
+	if _, err := exec.LookPath("gnome-screenshot"); err == nil {
+		gnome = append(gnome, backend{name: "gnome-screenshot window", grab: gnomeScreenshotWindowCLI})
+	}
+	plasma := []backend{
+		{name: "Spectacle window", grab: spectacleWindowScreenshot},
+	}
+	if strings.Contains(desktop, "kde") || strings.Contains(desktop, "plasma") {
+		if _, err := exec.LookPath("spectacle"); err != nil {
+			return nil
+		}
+		return plasma
+	}
+	return gnome
+}
+
 func gnomeShellScreenshot(ctx context.Context, dest string) error {
 	conn, err := dbus.SessionBus()
 	if err != nil {
@@ -172,6 +197,59 @@ func kwinScreenshot(ctx context.Context, dest string) error {
 		return nil
 	}
 	return copyFile(filename, dest)
+}
+
+func gnomeShellScreenshotWindow(ctx context.Context, dest string) error {
+	conn, err := dbus.SessionBus()
+	if err != nil {
+		return err
+	}
+	var ok bool
+	var used string
+	call := conn.Object("org.gnome.Shell.Screenshot", "/org/gnome/Shell/Screenshot").CallWithContext(
+		ctx,
+		"org.gnome.Shell.Screenshot.ScreenshotWindow",
+		0,
+		true,
+		false,
+		dest,
+	)
+	if err := call.Store(&ok, &used); err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("GNOME Shell refused the window screenshot")
+	}
+	if used != "" && used != dest {
+		return copyFile(used, dest)
+	}
+	return nil
+}
+
+func gnomeScreenshotWindowCLI(ctx context.Context, dest string) error {
+	bin, err := exec.LookPath("gnome-screenshot")
+	if err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, bin, "-w", "-f", dest)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w (%s)", err, strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+func spectacleWindowScreenshot(ctx context.Context, dest string) error {
+	spectacle, err := exec.LookPath("spectacle")
+	if err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, spectacle, "-b", "-n", "-a", "-o", dest)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w (%s)", err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 func gnomeScreenshotCLI(ctx context.Context, dest string) error {

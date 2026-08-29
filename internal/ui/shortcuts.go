@@ -103,6 +103,9 @@ func (w *Window) openShortcutSettings() {
 		list.Append(title)
 
 		for _, binding := range group.Bindings {
+			if binding.ID == keys.CaptureWindow {
+				continue
+			}
 			binding := binding
 			line := gtk.NewBox(gtk.OrientationHorizontal, 12)
 			name := gtk.NewLabel(i18n.T(binding.Label))

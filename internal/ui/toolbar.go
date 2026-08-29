@@ -21,8 +21,9 @@ func ensureToolbarCSS() {
 .lamha-toolbar {
   background-color: alpha(black, 0.78);
   border-radius: 14px;
-  padding: 8px 14px;
+  padding: 12px 16px;
   margin-top: 16px;
+  min-height: 56px;
   color: white;
 }
 .lamha-toolbar button {
@@ -62,21 +63,47 @@ func ensureToolbarCSS() {
 .lamha-toolbar scale trough {
   background-color: alpha(white, 0.25);
 }
-.lamha-toolbar spinbutton {
-  min-width: 54px;
-  min-height: 28px;
-  color: white;
-}
 .lamha-toolbar .dim-label {
   color: alpha(white, 0.85);
 }
 .lamha-stroke-preview {
-  min-width: 36px;
-  min-height: 22px;
+  min-width: 64px;
+  min-height: 18px;
+  margin: 4px 4px;
+}
+.lamha-stroke-stepper {
+  margin: 4px 2px;
+  padding: 2px;
+  border-radius: 8px;
+  min-height: 32px;
+}
+.lamha-stroke-stepper-dark {
+  background-color: alpha(white, 0.12);
+  border: 1px solid alpha(white, 0.28);
+}
+.lamha-stroke-stepper-light {
+  background-color: alpha(currentColor, 0.06);
+  border: 1px solid alpha(currentColor, 0.16);
+}
+.lamha-stroke-stepper button {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0 4px;
+  border-radius: 6px;
+}
+.lamha-stroke-stepper-dark button,
+.lamha-stroke-stepper-dark .lamha-stroke-value {
+  color: white;
+}
+.lamha-stroke-value {
+  min-width: 2.2em;
+  font-weight: 600;
+  padding: 0 6px;
 }
 .lamha-swatch {
   min-width: 32px;
   min-height: 32px;
+  margin: 2px 1px;
   padding: 3px;
   border-radius: 999px;
 }
@@ -114,6 +141,12 @@ func ensureToolbarCSS() {
   min-width: 28px;
   min-height: 28px;
 }
+window.lamha-picker {
+  background-color: transparent;
+}
+.lamha-picker-canvas {
+  background-color: transparent;
+}
 `)
 		if display := gdk.DisplayGetDefault(); display != nil {
 			gtk.StyleContextAddProviderForDisplay(display, provider, gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
@@ -132,6 +165,7 @@ func newIconButton(icon, tip string) *gtk.Button {
 	button.SetChild(newToolbarIcon(icon))
 	button.SetTooltipText(tip)
 	button.SetHasFrame(false)
+	unfocusable(&button.Widget)
 	return button
 }
 
@@ -140,6 +174,7 @@ func newIconToggle(icon, tip string) *gtk.ToggleButton {
 	button.SetChild(newToolbarIcon(icon))
 	button.SetTooltipText(tip)
 	button.SetHasFrame(false)
+	unfocusable(&button.Widget)
 	return button
 }
 
@@ -186,6 +221,8 @@ func appendColorSwatches(box *gtk.Box, active int, onPick func(int)) *colorSwitc
 		button.SetChild(area)
 		button.SetTooltipText(withKey(colorName(item.name), colorID(i)))
 		button.SetHasFrame(false)
+		button.SetVAlign(gtk.AlignCenter)
+		unfocusable(&button.Widget)
 		button.SetCSSClasses([]string{"lamha-swatch"})
 		if group == nil {
 			group = button

@@ -2,6 +2,7 @@
 package brand
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/binary"
 	"os"
@@ -16,11 +17,25 @@ import (
 // Name is the freedesktop icon name used by the desktop file and windows.
 const Name = "io.github.lamha.Lamha"
 
+// DeveloperName is the public workshop name shown in About Me.
+const DeveloperName = "Shenepoy"
+
+// DeveloperProfileURL is the GitHub profile used in About Me.
+const DeveloperProfileURL = "https://github.com/Zyzto"
+
+// SourceURL is the public Lamha repository.
+const SourceURL = "https://github.com/Zyzto/Lamha"
+
 // PanelName is a tray-only icon so the panel does not scale the padded SVG to 16px.
 const PanelName = Name + "-panel"
 
 //go:embed logo.svg
 var SVG []byte
+
+const (
+	logoCanvas  = `width="1024" height="1024" viewBox="0 0 1024 1024"`
+	panelCanvas = `width="754" height="754" viewBox="135 133 754 754"`
+)
 
 var (
 	once       sync.Once
@@ -53,6 +68,10 @@ func Install() error {
 			themeErr = err
 			return
 		}
+		if err := os.WriteFile(filepath.Join(hicolor, PanelName+".svg"), panelSVG(), 0o644); err != nil {
+			themeErr = err
+			return
+		}
 
 		cache := os.Getenv("XDG_CACHE_HOME")
 		if cache == "" {
@@ -65,6 +84,10 @@ func Install() error {
 		}
 		trayDir = filepath.Join(cache, "lamha", "icons")
 		if err := os.MkdirAll(trayDir, 0o755); err != nil {
+			themeErr = err
+			return
+		}
+		if err := os.WriteFile(filepath.Join(trayDir, PanelName+".svg"), panelSVG(), 0o644); err != nil {
 			themeErr = err
 			return
 		}
@@ -107,10 +130,13 @@ func Pixbuf(size int) *gdkpixbuf.Pixbuf {
 	return renderSVG(size)
 }
 
-// TrayPixbuf renders a tight, high-resolution crop that fills a panel slot.
+// TrayPixbuf renders the cropped panel logo so the mark fills a tray slot.
 func TrayPixbuf(size int) *gdkpixbuf.Pixbuf {
 	if size < 32 {
 		size = 32
+	}
+	if src := renderSVGBytes(panelSVG(), size); src != nil {
+		return src
 	}
 	src := renderSVG(512)
 	if src == nil {
@@ -123,6 +149,11 @@ func TrayPixbuf(size int) *gdkpixbuf.Pixbuf {
 		return src
 	}
 	return src.ScaleSimple(size, size, gdkpixbuf.InterpBilinear)
+}
+
+// panelSVG is a copy of the window logo with empty canvas cropped off.
+func panelSVG() []byte {
+	return bytes.Replace(SVG, []byte(logoCanvas), []byte(panelCanvas), 1)
 }
 
 // Image is a GTK image of the logo at pixel size.
@@ -171,12 +202,19 @@ func Pixmaps() []Pixmap {
 }
 
 func renderSVG(size int) *gdkpixbuf.Pixbuf {
+	return renderSVGBytes(SVG, size)
+}
+
+func renderSVGBytes(data []byte, size int) *gdkpixbuf.Pixbuf {
 	if size < 16 {
 		size = 16
 	}
+	if len(data) == 0 {
+		return nil
+	}
 	loader := gdkpixbuf.NewPixbufLoader()
 	loader.SetSize(size, size)
-	if err := loader.Write(SVG); err != nil {
+	if err := loader.Write(data); err != nil {
 		return nil
 	}
 	if err := loader.Close(); err != nil {

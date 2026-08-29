@@ -111,7 +111,7 @@ func (s *Store) ResetAll() error {
 func (s *Store) GNOMEAccels() map[string]string {
 	return map[string]string{
 		"lamha-area":   s.Accel(CaptureArea),
-		"lamha-window": s.Accel(CaptureWindow),
+		"lamha-window": "",
 		"lamha-screen": s.Accel(CaptureScreen),
 	}
 }

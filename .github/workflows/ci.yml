@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  CGO_ENABLED: "1"
+
+jobs:
+  test-and-build:
+    name: Test & Binary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install GTK4 build deps
+        run: bash ./scripts/ci/install_gtk.sh
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Read version
+        id: ver
+        run: eval "$(bash ./scripts/ci/app_version.sh)" && echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build binary
+        run: |
+          version="${{ steps.ver.outputs.name }}"
+          go build -trimpath -ldflags "-s -w -X github.com/lamha-app/lamha/internal/version.Version=${version}" \
+            -o "dist/lamha-${version}-linux-x86_64" ./cmd/lamha
+          chmod +x "dist/lamha-${version}-linux-x86_64"
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: lamha-linux-x86_64
+          path: dist/lamha-*-linux-x86_64
+          if-no-files-found: error

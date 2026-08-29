@@ -19,8 +19,16 @@ func TestLanguageIsArabic(t *testing.T) {
 	}
 }
 
+func TestSetLanguageArabic(t *testing.T) {
+	SetLanguage("ar")
+	t.Cleanup(func() { SetLanguage("system") })
+	if !Arabic() || T("Settings") == "Settings" {
+		t.Fatalf("SetLanguage(ar) Arabic=%v Settings=%q", Arabic(), T("Settings"))
+	}
+}
+
 func TestArabicMessagesCoverCommonUI(t *testing.T) {
-	for _, key := range []string{"Move marks", "Pen", "Arrow", "Ellipse", "Text", "Capture area", "Area", "Recent", "Main menu", "Copy path", "Delete"} {
+	for _, key := range []string{"Move marks", "Pen", "Arrow", "Ellipse", "Text", "Capture area", "Area", "Recent", "Main menu", "Copy path", "Delete", "Appearance", "Dark", "Language", "About Me", "Source Code"} {
 		if arabicMessages[key] == "" {
 			t.Fatalf("missing Arabic for %q", key)
 		}

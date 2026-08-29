@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/diamondburned/gotk4/pkg/gdk/v4"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 
@@ -25,9 +27,14 @@ type keyActions struct {
 var relevantMods = gdk.ControlMask | gdk.ShiftMask | gdk.AltMask | gdk.SuperMask | gdk.MetaMask
 
 func handleAnnotateKey(keyval uint, state gdk.ModifierType, actions keyActions) bool {
+	state &= relevantMods
 	ctrl := state.Has(gdk.ControlMask)
 	shift := state.Has(gdk.ShiftMask)
 	store := keys.Current()
+	if ctrl && shift && sameKey(keyval, gdk.KEY_z) && actions.redo != nil {
+		actions.redo()
+		return true
+	}
 	type binding struct {
 		id keys.ID
 		fn func() bool
@@ -50,8 +57,18 @@ func handleAnnotateKey(keyval uint, state gdk.ModifierType, actions keyActions) 
 	}
 
 	for _, item := range []binding{
-		{keys.Undo, func() bool { actions.undo(); return true }},
-		{keys.Redo, func() bool { actions.redo(); return true }},
+		{keys.Undo, func() bool {
+			if actions.undo != nil {
+				actions.undo()
+			}
+			return true
+		}},
+		{keys.Redo, func() bool {
+			if actions.redo != nil {
+				actions.redo()
+			}
+			return true
+		}},
 		{keys.Save, func() bool { actions.save(); return true }},
 		{keys.ToggleCopy, func() bool {
 			if actions.toggleCopy != nil {
@@ -106,6 +123,7 @@ func matchAccel(accel string, keyval uint, state gdk.ModifierType) bool {
 	if accel == "" {
 		return false
 	}
+	accel = strings.ReplaceAll(accel, "<Primary>", "<Control>")
 	wantKey, wantMods, ok := gtk.AcceleratorParse(accel)
 	if !ok || wantKey == 0 {
 		return false

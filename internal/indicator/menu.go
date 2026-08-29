@@ -1,11 +1,17 @@
 package indicator
 
 import (
+	"time"
+
 	"github.com/godbus/dbus/v5"
 
 	"github.com/lamha-app/lamha/internal/brand"
 	"github.com/lamha-app/lamha/internal/i18n"
 )
+
+// How long to wait after a tray-menu click so GNOME/KDE can unmap the popup
+// and paint a clean frame before the screenshot.
+const menuDismissWait = 350 * time.Millisecond
 
 const (
 	menuCaptureArea   int32 = 1
@@ -100,17 +106,11 @@ func (m *dbusMenu) Event(id int32, eventID string, data dbus.Variant, timestamp 
 	}
 	switch id {
 	case menuCaptureArea:
-		if m.host.OnCaptureArea != nil {
-			m.host.OnCaptureArea()
-		}
+		invokeAfterMenu(m.host.OnCaptureArea)
 	case menuCaptureWindow:
-		if m.host.OnCaptureWindow != nil {
-			m.host.OnCaptureWindow()
-		}
+		invokeAfterMenu(m.host.OnCaptureWindow)
 	case menuCaptureScreen:
-		if m.host.OnCaptureScreen != nil {
-			m.host.OnCaptureScreen()
-		}
+		invokeAfterMenu(m.host.OnCaptureScreen)
 	case menuOpen:
 		if m.host.OnShowWindow != nil {
 			m.host.OnShowWindow()
@@ -121,6 +121,13 @@ func (m *dbusMenu) Event(id int32, eventID string, data dbus.Variant, timestamp 
 		}
 	}
 	return nil
+}
+
+func invokeAfterMenu(fn func()) {
+	if fn == nil {
+		return
+	}
+	time.AfterFunc(menuDismissWait, fn)
 }
 
 func (m *dbusMenu) EventGroup(events []struct {
@@ -158,7 +165,15 @@ func (m *dbusMenu) root() menuNode {
 func (m *dbusMenu) items() []menuNode {
 	return []menuNode{
 		item(menuCaptureArea, i18n.T("Capture area")),
-		item(menuCaptureWindow, i18n.T("Capture window")),
+		{
+			ID: menuCaptureWindow,
+			Props: map[string]dbus.Variant{
+				"type":    dbus.MakeVariant("standard"),
+				"label":   dbus.MakeVariant(i18n.T("Capture window")),
+				"enabled": dbus.MakeVariant(false),
+				"visible": dbus.MakeVariant(true),
+			},
+		},
 		item(menuCaptureScreen, i18n.T("Capture screen")),
 		{ID: 4, Props: map[string]dbus.Variant{"type": dbus.MakeVariant("separator")}},
 		item(menuOpen, i18n.T("Open Lamha")),

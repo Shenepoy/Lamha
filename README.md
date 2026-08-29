@@ -22,6 +22,7 @@
 </p>
 
 <p align="center">
+  <a href="#screenshots">Screenshots</a> ·
   <a href="#what-you-get">What you get</a> ·
   <a href="#install">Install</a> ·
   <a href="#develop">Develop</a> ·
@@ -34,6 +35,26 @@
   <span dir="rtl"><strong>لمحة</strong></span>
   (<em>lamḥa</em>): a glance / a glimpse —
   catch the screen in one look.
+</p>
+
+---
+
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/Image1.png" alt="Home — recent captures and preview" width="640" />
+</p>
+
+<p align="center">
+  <img src="screenshots/Image2.png" alt="Annotate — tools, colors, and stroke" width="640" />
+</p>
+
+<p align="center">
+  <img src="screenshots/Image3.png" alt="Capture overlay toolbar — tools, colors, and stroke" width="720" />
+</p>
+
+<p align="center">
+  <sub>Home · Annotate · Overlay toolbar</sub>
 </p>
 
 ---
@@ -66,6 +87,16 @@ Captures land in `$XDG_DATA_HOME/lamha/captures` (usually `~/.local/share/lamha/
 ---
 
 ## Install
+
+### GitHub Releases
+
+Tagged builds publish a Linux binary and an AppImage:
+
+- [Latest release](https://github.com/Zyzto/Lamha/releases/latest)
+- `lamha-YY.0M.MICRO-linux-x86_64` — standalone binary (needs GTK 4 on the host)
+- `Lamha-YY.0M.MICRO-x86_64.AppImage` — bundled GTK 4
+
+Mark the AppImage executable, then run it. Versions are calendar versions like Janan: `YY.0M.MICRO` (first August 2026 release is `26.08.0`). Tag `v26.08.0`. The number lives in `VERSION`.
 
 ### From source
 
@@ -119,7 +150,17 @@ lamha --capture=screen
 make test
 make build
 make fmt
+lamha --version
 ```
+
+Cut a release by bumping `VERSION` (or `bash scripts/ci/next_version.sh`), committing, then:
+
+```bash
+git tag v26.08.0
+git push origin v26.08.0
+```
+
+Actions tests, builds the binary and AppImage, and attaches them to the GitHub Release.
 
 ---
 

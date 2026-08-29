@@ -4,6 +4,7 @@
 result
 result-*
 .direnv/
+.polyscreen-mcp/
 *~
 *.swp
 .DS_Store

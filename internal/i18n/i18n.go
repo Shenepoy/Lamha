@@ -9,23 +9,68 @@ import (
 )
 
 var (
-	once     sync.Once
+	mu       sync.RWMutex
+	ready    bool
+	override string
 	arabic   bool
 	messages map[string]string
 )
 
-func initLocale() {
-	once.Do(func() {
+func ensureLocale() {
+	mu.Lock()
+	defer mu.Unlock()
+	if !ready {
+		applyLocked()
+	}
+}
+
+func applyLocked() {
+	switch override {
+	case "ar":
+		arabic = true
+		messages = arabicMessages
+	case "en":
+		arabic = false
+		messages = nil
+	default:
 		arabic = languageIsArabic(languageTag())
 		if arabic {
 			messages = arabicMessages
+		} else {
+			messages = nil
 		}
-	})
+	}
+	ready = true
+}
+
+// SetLanguage overrides the process language. Empty or "system" follows the OS.
+func SetLanguage(code string) {
+	mu.Lock()
+	defer mu.Unlock()
+	switch strings.ToLower(strings.TrimSpace(code)) {
+	case "ar", "ar_sa", "arabic":
+		override = "ar"
+	case "en", "en_us", "english":
+		override = "en"
+	default:
+		override = ""
+	}
+	applyLocked()
+}
+
+// Language is the override in use: en, ar, or empty for system.
+func Language() string {
+	ensureLocale()
+	mu.RLock()
+	defer mu.RUnlock()
+	return override
 }
 
 // Arabic reports whether the UI should use Arabic copy.
 func Arabic() bool {
-	initLocale()
+	ensureLocale()
+	mu.RLock()
+	defer mu.RUnlock()
 	return arabic
 }
 
@@ -36,7 +81,9 @@ func RTL() bool {
 
 // T translates an English UI string. Unknown keys stay in English.
 func T(msg string) string {
-	initLocale()
+	ensureLocale()
+	mu.RLock()
+	defer mu.RUnlock()
 	if messages == nil {
 		return msg
 	}

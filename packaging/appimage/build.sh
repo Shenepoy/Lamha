@@ -27,10 +27,21 @@ if ! command -v curl >/dev/null; then
   exit 1
 fi
 
+version="${LAMHA_VERSION:-}"
+if [[ -z "$version" ]]; then
+  version="$(tr -d '[:space:]' < "$root/VERSION")"
+fi
+if [[ ! "$version" =~ ^[0-9]{2}\.[0-9]{2}\.[0-9]+$ ]]; then
+  echo "VERSION must be YY.0M.MICRO, got: ${version:-<empty>}" >&2
+  exit 1
+fi
+
+ldflags="-s -w -X github.com/lamha-app/lamha/internal/version.Version=${version}"
+
 mkdir -p "$root/bin" "$dist"
 (
   cd "$root"
-  go build -o "$root/bin/lamha" ./cmd/lamha
+  go build -trimpath -ldflags "$ldflags" -o "$root/bin/lamha" ./cmd/lamha
 )
 
 rm -rf "$appdir"
@@ -76,4 +87,14 @@ cd "$dist"
   --plugin gtk \
   --output appimage
 
-echo "AppImage written under $dist"
+bundle="$dist/Lamha-${arch}.AppImage"
+if [[ ! -f "$bundle" ]]; then
+  bundle="$(find "$dist" -maxdepth 1 -type f -name '*.AppImage' ! -name 'linuxdeploy*' | head -n 1 || true)"
+fi
+if [[ -z "${bundle}" || ! -f "$bundle" ]]; then
+  echo "linuxdeploy did not write an AppImage under $dist" >&2
+  exit 1
+fi
+named="$dist/Lamha-${version}-${arch}.AppImage"
+mv -f "$bundle" "$named"
+echo "AppImage written to $named"

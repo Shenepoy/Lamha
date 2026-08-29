@@ -17,4 +17,11 @@
     <category>Utility</category>
     <category>Graphics</category>
   </categories>
+  <releases>
+    <release version="26.08.0" date="2026-08-29">
+      <description>
+        <p>Initial public release.</p>
+      </description>
+    </release>
+  </releases>
 </component>

@@ -20,16 +20,23 @@ import (
 	"github.com/lamha-app/lamha/internal/portal"
 	"github.com/lamha-app/lamha/internal/prefs"
 	"github.com/lamha-app/lamha/internal/ui"
+	"github.com/lamha-app/lamha/internal/version"
 )
 
 const appID = "io.github.lamha.Lamha"
 
 func main() {
+	if versionRequested(os.Args[1:]) {
+		fmt.Printf("lamha %s\n", version.String())
+		return
+	}
+
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("lamha: ")
 	log.Printf("starting pid=%d", os.Getpid())
 	keys.Load()
 	prefs.Load()
+	i18n.SetLanguage(prefs.Current().Language())
 	if err := brand.Install(); err != nil {
 		log.Printf("could not install app icon: %v", err)
 	}
@@ -89,7 +96,7 @@ func main() {
 		if _, err := indicator.Start(&indicator.Host{
 			OnShowWindow:    func() { glib.IdleAdd(func() { win.Present() }) },
 			OnCaptureArea:   func() { glib.IdleAdd(func() { win.StartCapture(ui.CaptureArea) }) },
-			OnCaptureWindow: func() { glib.IdleAdd(func() { win.StartCapture(ui.CaptureWindow) }) },
+			OnCaptureWindow: func() { glib.IdleAdd(func() { win.StartWindowPick() }) },
 			OnCaptureScreen: func() { glib.IdleAdd(func() { win.StartCapture(ui.CaptureScreen) }) },
 			OnQuit:          func() { glib.IdleAdd(func() { app.Quit() }) },
 		}); err != nil {
@@ -202,6 +209,18 @@ func main() {
 	os.Exit(app.Run(os.Args))
 }
 
+func versionRequested(args []string) bool {
+	for _, arg := range args {
+		if arg == "--" {
+			return false
+		}
+		if arg == "--version" || arg == "-V" {
+			return true
+		}
+	}
+	return false
+}
+
 func desktopIsGNOME() bool {
 	return strings.Contains(strings.ToUpper(os.Getenv("XDG_CURRENT_DESKTOP")), "GNOME")
 }
@@ -210,7 +229,6 @@ func currentPortalShortcuts() []portal.Shortcut {
 	store := keys.Current()
 	return []portal.Shortcut{
 		{ID: portal.ShortcutArea, Description: i18n.T("Capture area"), Trigger: keys.ToPortalTrigger(store.Accel(keys.CaptureArea))},
-		{ID: portal.ShortcutWindow, Description: i18n.T("Capture window"), Trigger: keys.ToPortalTrigger(store.Accel(keys.CaptureWindow))},
 		{ID: portal.ShortcutScreen, Description: i18n.T("Capture screen"), Trigger: keys.ToPortalTrigger(store.Accel(keys.CaptureScreen))},
 	}
 }

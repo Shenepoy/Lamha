@@ -27,7 +27,7 @@ type binding struct {
 func captureBindings(accels map[string]string) []binding {
 	items := []binding{
 		{id: "lamha-area", name: i18n.T("Lamha capture area"), args: "--capture=area", accel: "<Control><Shift>A"},
-		{id: "lamha-window", name: i18n.T("Lamha capture window"), args: "--capture=window", accel: "<Control><Shift>W"},
+		{id: "lamha-window", name: i18n.T("Lamha capture window"), args: "--capture=window", accel: ""},
 		{id: "lamha-screen", name: i18n.T("Lamha capture screen"), args: "--capture=screen", accel: "<Control><Shift>S"},
 	}
 	for i, item := range items {

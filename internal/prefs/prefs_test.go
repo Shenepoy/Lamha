@@ -20,6 +20,31 @@ func TestClampZoom(t *testing.T) {
 	}
 }
 
+func TestNormalizeThemeAndLanguage(t *testing.T) {
+	if NormalizeTheme("") != ThemeSystem || NormalizeTheme("dark") != ThemeDark {
+		t.Fatal("NormalizeTheme")
+	}
+	if NormalizeLanguage("") != LanguageSystem || NormalizeLanguage("ar") != LanguageArabic {
+		t.Fatal("NormalizeLanguage")
+	}
+}
+
+func TestSetThemeAndLanguageRoundTrip(t *testing.T) {
+	store := &Store{current: defaults(), path: filepath.Join(t.TempDir(), "settings.json")}
+	if err := store.SetTheme(ThemeDark); err != nil {
+		t.Fatal(err)
+	}
+	if store.Theme() != ThemeDark {
+		t.Fatalf("Theme() = %q", store.Theme())
+	}
+	if err := store.SetLanguage(LanguageArabic); err != nil {
+		t.Fatal(err)
+	}
+	if store.Language() != LanguageArabic {
+		t.Fatalf("Language() = %q", store.Language())
+	}
+}
+
 func TestSetMagnifierZoomRoundTrip(t *testing.T) {
 	store := &Store{current: defaults(), path: filepath.Join(t.TempDir(), "settings.json")}
 	if err := store.SetMagnifierZoom(7); err != nil {

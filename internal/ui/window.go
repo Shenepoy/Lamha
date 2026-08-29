@@ -16,9 +16,9 @@ import (
 
 	"github.com/lamha-app/lamha/internal/brand"
 	"github.com/lamha-app/lamha/internal/capture"
-	"github.com/lamha-app/lamha/internal/grab"
 	"github.com/lamha-app/lamha/internal/i18n"
 	"github.com/lamha-app/lamha/internal/portal"
+	"github.com/lamha-app/lamha/internal/prefs"
 )
 
 // Window is Lamha's main application window.
@@ -38,10 +38,18 @@ type Window struct {
 	copyButton          *gtk.Button
 	annotateBtn         *gtk.Button
 	openButton          *gtk.Button
+	menuBtn             *gtk.MenuButton
+	delayLabel          *gtk.Label
+	recentTitle         *gtk.Label
+	historyPlaceholder  *gtk.Label
+	emptyPreview        *gtk.Label
+	settingsWin         *gtk.Window
+	aboutWin            *gtk.Window
 	lastCapture         *capture.SavedCapture
 	menuTarget          *capture.SavedCapture
 	editor              *editor
 	overlay             *captureOverlay
+	portalHost          *gtk.Window
 	busy                bool
 	restoreAfterCapture bool
 	shortcuts           *gtk.Window
@@ -62,6 +70,7 @@ func New(application *gtk.Application) (*Window, error) {
 		store:  store,
 	}
 	applyAppDirection()
+	applyTheme(prefs.Current().Theme())
 	brand.ApplyIconTheme()
 	w.build()
 	w.refreshHistory("")
@@ -99,6 +108,9 @@ func (w *Window) StartCapture(mode CaptureMode) {
 		w.Present()
 		return
 	}
+	if mode == CaptureWindow {
+		return
+	}
 	w.startCapture(mode)
 }
 
@@ -126,8 +138,8 @@ func (w *Window) build() {
 	w.captureArea.ConnectClicked(func() { w.StartCapture(CaptureArea) })
 	modes.Append(w.captureArea)
 	w.captureWindow = gtk.NewButtonWithLabel(i18n.T("Window"))
-	w.captureWindow.SetTooltipText(i18n.T("Freeze the screen, then select a window area in Lamha"))
-	w.captureWindow.ConnectClicked(func() { w.StartCapture(CaptureWindow) })
+	w.captureWindow.SetSensitive(false)
+	w.captureWindow.SetTooltipText(i18n.T("Window capture is temporarily unavailable"))
 	modes.Append(w.captureWindow)
 	w.captureScreen = gtk.NewButtonWithLabel(i18n.T("Screen"))
 	w.captureScreen.SetTooltipText(i18n.T("Freeze the screen, then mark it up in Lamha"))
@@ -146,19 +158,19 @@ func (w *Window) build() {
 	statusRow.Append(w.status)
 	header.PackStart(statusRow)
 
-	menuBtn := gtk.NewMenuButton()
-	menuBtn.SetIconName("open-menu-symbolic")
-	menuBtn.SetTooltipText(i18n.T("Main menu"))
-	menuBtn.SetPrimary(true)
-	menuBtn.SetHasFrame(false)
-	menuBtn.SetMenuModel(w.primaryMenu())
-	header.PackEnd(menuBtn)
+	w.menuBtn = gtk.NewMenuButton()
+	w.menuBtn.SetIconName("open-menu-symbolic")
+	w.menuBtn.SetTooltipText(i18n.T("Main menu"))
+	w.menuBtn.SetPrimary(true)
+	w.menuBtn.SetHasFrame(false)
+	w.menuBtn.SetMenuModel(w.primaryMenu())
+	header.PackEnd(w.menuBtn)
 
 	delayBox := gtk.NewBox(gtk.OrientationHorizontal, 6)
 	delayBox.SetVAlign(gtk.AlignCenter)
-	delayLabel := gtk.NewLabel(i18n.T("Delay"))
-	delayLabel.SetCSSClasses([]string{"dim-label"})
-	delayBox.Append(delayLabel)
+	w.delayLabel = gtk.NewLabel(i18n.T("Delay"))
+	w.delayLabel.SetCSSClasses([]string{"dim-label"})
+	delayBox.Append(w.delayLabel)
 	w.delay = gtk.NewDropDownFromStrings(delayLabels())
 	w.delay.SetSelected(0)
 	w.delay.SetTooltipText(i18n.T("Wait before capture so menus and hover states can appear"))
@@ -191,6 +203,7 @@ func (w *Window) installWindowActions() {
 	}
 	add("shortcuts", w.openShortcutSettings)
 	add("settings", w.openSettings)
+	add("about", w.openAbout)
 	add("open-folder", w.openCaptureFolder)
 	add("annotate-capture", w.annotateSelected)
 	add("copy-image", w.copyLatest)
@@ -210,6 +223,7 @@ func (w *Window) primaryMenu() gio.MenuModeller {
 	app := gio.NewMenu()
 	app.Append(i18n.T("Keyboard shortcuts"), "win.shortcuts")
 	app.Append(i18n.T("Settings"), "win.settings")
+	app.Append(i18n.T("About Me"), "win.about")
 	app.Append(i18n.T("Open captures folder"), "win.open-folder")
 
 	quit := gio.NewMenu()
@@ -224,10 +238,10 @@ func (w *Window) primaryMenu() gio.MenuModeller {
 func (w *Window) buildHistoryPane() gtk.Widgetter {
 	column := gtk.NewBox(gtk.OrientationVertical, 8)
 
-	title := gtk.NewLabel(i18n.T("Recent"))
-	alignStart(title)
-	title.SetCSSClasses([]string{"title-4"})
-	column.Append(title)
+	w.recentTitle = gtk.NewLabel(i18n.T("Recent"))
+	alignStart(w.recentTitle)
+	w.recentTitle.SetCSSClasses([]string{"title-4"})
+	column.Append(w.recentTitle)
 
 	scroll := gtk.NewScrolledWindow()
 	scroll.SetPolicy(gtk.PolicyAutomatic, gtk.PolicyAutomatic)
@@ -241,11 +255,11 @@ func (w *Window) buildHistoryPane() gtk.Widgetter {
 	w.history.SetSelectionMode(gtk.SelectionSingle)
 	w.history.SetShowSeparators(false)
 	w.history.SetCSSClasses([]string{"navigation-sidebar"})
-	placeholder := gtk.NewLabel(i18n.T("No captures yet"))
-	placeholder.SetCSSClasses([]string{"dim-label"})
-	placeholder.SetWrap(true)
-	placeholder.SetJustify(gtk.JustifyCenter)
-	w.history.SetPlaceholder(&placeholder.Widget)
+	w.historyPlaceholder = gtk.NewLabel(i18n.T("No captures yet"))
+	w.historyPlaceholder.SetCSSClasses([]string{"dim-label"})
+	w.historyPlaceholder.SetWrap(true)
+	w.historyPlaceholder.SetJustify(gtk.JustifyCenter)
+	w.history.SetPlaceholder(&w.historyPlaceholder.Widget)
 	w.history.ConnectRowSelected(w.historySelected)
 	scroll.SetChild(w.history)
 	column.Append(scroll)
@@ -266,17 +280,17 @@ func (w *Window) buildPreviewPane() gtk.Widgetter {
 	w.preview.SetContentFit(gtk.ContentFitContain)
 	w.preview.SetSizeRequest(480, 320)
 
-	empty := gtk.NewLabel(i18n.T("Select a capture to preview it."))
-	empty.SetCSSClasses([]string{"dim-label"})
-	empty.SetWrap(true)
-	empty.SetHAlign(gtk.AlignCenter)
-	empty.SetVAlign(gtk.AlignCenter)
-	empty.SetJustify(gtk.JustifyCenter)
+	w.emptyPreview = gtk.NewLabel(i18n.T("Select a capture to preview it."))
+	w.emptyPreview.SetCSSClasses([]string{"dim-label"})
+	w.emptyPreview.SetWrap(true)
+	w.emptyPreview.SetHAlign(gtk.AlignCenter)
+	w.emptyPreview.SetVAlign(gtk.AlignCenter)
+	w.emptyPreview.SetJustify(gtk.JustifyCenter)
 
 	w.previewStack = gtk.NewStack()
 	w.previewStack.SetHExpand(true)
 	w.previewStack.SetVExpand(true)
-	w.previewStack.AddNamed(empty, "empty")
+	w.previewStack.AddNamed(w.emptyPreview, "empty")
 	w.previewStack.AddNamed(w.preview, "image")
 	w.previewStack.SetVisibleChildName("empty")
 	w.attachPreviewMenu()
@@ -312,10 +326,21 @@ func (w *Window) startCapture(mode CaptureMode) {
 	delay := delayFromIndex(w.delay.Selected())
 	w.restoreAfterCapture = w.window.IsVisible()
 	w.setBusy(true, i18n.T("Capturing screen…"))
+	mon := monitorRect(w.window)
+	log.Printf("starting capture mode=%d", mode)
+
+	if mode == CaptureWindow {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+			defer cancel()
+			w.startWindowCapture(ctx, delay, mon)
+		}()
+		return
+	}
+
 	if w.restoreAfterCapture {
 		w.window.Present()
 	}
-	log.Printf("starting capture mode=%d", mode)
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
@@ -333,33 +358,7 @@ func (w *Window) startCapture(mode CaptureMode) {
 			timer.Stop()
 		}
 
-		log.Printf("trying silent compositor grab")
-		staging, err := grab.Fast(ctx)
-		if err != nil {
-			log.Printf("silent grab failed: %v", err)
-			glib.IdleAdd(func() {
-				w.status.SetText(i18n.T("Requesting screenshot access…"))
-			})
-			parent, drop := w.portalParentIfMapped(ctx)
-			defer drop()
-			log.Printf("portal parent=%q", parent)
-
-			staging, err = grab.ViaPortal(ctx, portal.ScreenshotOptions{ParentWindow: parent})
-			if err != nil && !errors.Is(err, portal.ErrCancelled) {
-				log.Printf("silent portal failed; asking GNOME for permission: %v", err)
-				glib.IdleAdd(func() {
-					w.status.SetText(i18n.T("GNOME needs one-time permission. Allow the system screenshot dialog."))
-				})
-				staging, err = grab.ViaPortal(ctx, portal.ScreenshotOptions{
-					ParentWindow: parent,
-					Interactive:  true,
-				})
-			}
-			if err != nil {
-				log.Printf("portal grab failed: %v", err)
-			}
-		}
-
+		staging, err := w.grabSilent(ctx)
 		glib.IdleAdd(func() {
 			w.setBusy(false, "")
 			if err != nil {
@@ -367,7 +366,7 @@ func (w *Window) startCapture(mode CaptureMode) {
 				return
 			}
 			log.Printf("opening capture overlay")
-			w.openCaptureOverlay(mode, staging)
+			w.openCaptureOverlay(mode, staging, nil)
 		})
 	}()
 }
@@ -382,7 +381,7 @@ func (w *Window) captureFailed(err error) {
 func (w *Window) setBusy(busy bool, message string) {
 	w.busy = busy
 	w.captureArea.SetSensitive(!busy)
-	w.captureWindow.SetSensitive(!busy)
+	w.captureWindow.SetSensitive(false)
 	w.captureScreen.SetSensitive(!busy)
 	w.delay.SetSensitive(!busy)
 	if busy {
@@ -398,7 +397,7 @@ func (w *Window) setBusy(busy bool, message string) {
 func (w *Window) failCapture(err error) {
 	message := i18n.Tf("Could not capture: %v", err)
 	switch {
-	case errors.Is(err, portal.ErrCancelled):
+	case errors.Is(err, portal.ErrCancelled), errors.Is(err, errCaptureCancelled):
 		message = i18n.T("Capture cancelled.")
 	case errors.Is(err, portal.ErrDenied):
 		message = i18n.T("GNOME denied the screenshot. Allow Lamha in the system dialog, or Settings → Privacy → Screen, then try again.")

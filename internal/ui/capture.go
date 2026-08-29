@@ -1,12 +1,15 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/lamha-app/lamha/internal/i18n"
 )
+
+var errCaptureCancelled = errors.New("capture cancelled")
 
 // CaptureMode is a user-facing capture action.
 type CaptureMode int

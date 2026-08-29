@@ -49,6 +49,7 @@ func newDrawnToggle(draw iconDraw, tip string, ink iconInk) *gtk.ToggleButton {
 	button.SetChild(newIconCanvas(draw, ink))
 	button.SetTooltipText(tip)
 	button.SetHasFrame(false)
+	unfocusable(&button.Widget)
 	return button
 }
 

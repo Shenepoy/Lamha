@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/diamondburned/gotk4/pkg/cairo"
@@ -18,6 +19,7 @@ const (
 type strokeControl struct {
 	box        *gtk.Box
 	adjustment *gtk.Adjustment
+	value      *gtk.Label
 	updating   bool
 }
 
@@ -49,18 +51,19 @@ func newStrokeControl(value float64, compact, dark bool, tooltip string, onChang
 	}
 
 	preview := gtk.NewDrawingArea()
-	preview.SetSizeRequest(36, 22)
-	preview.SetContentWidth(36)
-	preview.SetContentHeight(22)
+	preview.SetVAlign(gtk.AlignCenter)
 	preview.SetCSSClasses([]string{"lamha-stroke-preview"})
 	preview.SetTooltipText(tooltip)
 	preview.SetDrawFunc(func(_ *gtk.DrawingArea, cr *cairo.Context, width, height int) {
 		drawStrokePreview(cr, width, height, adj.Value(), dark)
 	})
+	unfocusable(&preview.Widget)
+	resizeStrokePreview(preview, value)
 	box.Append(preview)
 
 	scale := gtk.NewScale(gtk.OrientationHorizontal, adj)
 	scale.SetDrawValue(false)
+	scale.SetVAlign(gtk.AlignCenter)
 	scale.SetTooltipText(tooltip)
 	if compact {
 		scale.SetSizeRequest(88, -1)
@@ -68,17 +71,45 @@ func newStrokeControl(value float64, compact, dark bool, tooltip string, onChang
 		scale.SetSizeRequest(140, -1)
 		scale.SetHExpand(true)
 	}
+	unfocusable(&scale.Widget)
 	box.Append(scale)
 
-	spin := gtk.NewSpinButton(adj, 1, 0)
-	spin.SetNumeric(true)
-	spin.SetSnapToTicks(true)
-	spin.SetSizeRequest(56, -1)
-	spin.SetTooltipText(tooltip)
-	box.Append(spin)
+	stepper := gtk.NewBox(gtk.OrientationHorizontal, 0)
+	stepper.SetVAlign(gtk.AlignCenter)
+	if dark {
+		stepper.SetCSSClasses([]string{"lamha-stroke-stepper", "lamha-stroke-stepper-dark"})
+	} else {
+		stepper.SetCSSClasses([]string{"lamha-stroke-stepper", "lamha-stroke-stepper-light"})
+	}
 
-	ctrl := &strokeControl{box: box, adjustment: adj}
+	minus := gtk.NewButtonWithLabel("−")
+	minus.SetTooltipText(withKey(i18n.T("Smaller brush"), keys.WidthDown))
+	minus.SetHasFrame(false)
+	unfocusable(&minus.Widget)
+
+	valueLabel := gtk.NewLabel(fmt.Sprintf("%.0f", value))
+	valueLabel.SetWidthChars(2)
+	valueLabel.SetXAlign(0.5)
+	valueLabel.SetCSSClasses([]string{"lamha-stroke-value"})
+	valueLabel.SetTooltipText(tooltip)
+
+	plus := gtk.NewButtonWithLabel("+")
+	plus.SetTooltipText(withKey(i18n.T("Larger brush"), keys.WidthUp))
+	plus.SetHasFrame(false)
+	unfocusable(&plus.Widget)
+
+	minus.ConnectClicked(func() { adj.SetValue(adj.Value() - 1) })
+	plus.ConnectClicked(func() { adj.SetValue(adj.Value() + 1) })
+
+	stepper.Append(minus)
+	stepper.Append(valueLabel)
+	stepper.Append(plus)
+	box.Append(stepper)
+
+	ctrl := &strokeControl{box: box, adjustment: adj, value: valueLabel}
 	adj.ConnectValueChanged(func() {
+		ctrl.value.SetText(fmt.Sprintf("%.0f", adj.Value()))
+		resizeStrokePreview(preview, adj.Value())
 		preview.QueueDraw()
 		if ctrl.updating {
 			return
@@ -101,8 +132,27 @@ func (s *strokeControl) SetValue(width float64) {
 	s.updating = false
 }
 
+func unfocusable(w *gtk.Widget) {
+	w.SetFocusable(false)
+	w.SetFocusOnClick(false)
+}
+
+func resizeStrokePreview(preview *gtk.DrawingArea, thickness float64) {
+	width, height := strokePreviewSize(thickness)
+	preview.SetSizeRequest(width, height)
+	preview.SetContentWidth(width)
+	preview.SetContentHeight(height)
+}
+
+func strokePreviewSize(thickness float64) (width, height int) {
+	line := clampStroke(thickness)
+	height = int(math.Max(18, line+8))
+	width = int(math.Max(64, line*3+16))
+	return
+}
+
 func drawStrokePreview(cr *cairo.Context, width, height int, thickness float64, dark bool) {
-	line := math.Min(clampStroke(thickness), float64(height)-4)
+	line := clampStroke(thickness)
 	if line < 1 {
 		line = 1
 	}
@@ -111,10 +161,10 @@ func drawStrokePreview(cr *cairo.Context, width, height int, thickness float64, 
 	} else {
 		cr.SetSourceRGB(0.17, 0.18, 0.20)
 	}
-	cr.SetLineCap(cairo.LineCapRound)
+	cr.SetLineCap(cairo.LineCapButt)
 	cr.SetLineWidth(line)
 	y := float64(height) / 2
-	pad := math.Max(line/2+1, 4)
+	pad := 4.0
 	cr.MoveTo(pad, y)
 	cr.LineTo(float64(width)-pad, y)
 	cr.Stroke()

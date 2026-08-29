@@ -115,6 +115,7 @@ func (e *editor) build() {
 
 	keysCtl := gtk.NewEventControllerKey()
 	keysCtl.SetPropagationPhase(gtk.PhaseCapture)
+	keysCtl.SetPropagationLimit(gtk.LimitNone)
 	keysCtl.ConnectKeyPressed(func(keyval, keycode uint, state gdk.ModifierType) bool {
 		if e.text.active() {
 			if keyval == gdk.KEY_Escape {
@@ -184,6 +185,7 @@ func (e *editor) build() {
 	e.canvas = gtk.NewDrawingArea()
 	e.canvas.SetHExpand(true)
 	e.canvas.SetVExpand(true)
+	e.canvas.SetFocusable(true)
 	e.canvas.SetCursorFromName(cursorForTool(e.tool))
 	e.canvas.SetDrawFunc(e.draw)
 	e.bindGestures()
@@ -708,6 +710,11 @@ func (e *editor) deleteSelected() {
 }
 
 func (e *editor) undo() {
+	if e.draft != nil {
+		e.draft = nil
+		e.canvas.QueueDraw()
+		return
+	}
 	if !e.doc.Undo() {
 		return
 	}

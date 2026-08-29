@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image"
+	"log"
 	"os"
 
 	"github.com/diamondburned/gotk4/pkg/cairo"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/lamha-app/lamha/internal/annotate"
 	"github.com/lamha-app/lamha/internal/brand"
+	"github.com/lamha-app/lamha/internal/grab"
 	"github.com/lamha-app/lamha/internal/i18n"
 	"github.com/lamha-app/lamha/internal/keys"
 )
@@ -50,9 +52,16 @@ type captureOverlay struct {
 	text          textInput
 	redraw        redrawPump
 	lens          *magnifierLens
+	frames        []image.Rectangle
+	hovered       image.Rectangle
+	windowLocked  bool
 }
 
-func (w *Window) openCaptureOverlay(mode CaptureMode, staging string) {
+func (w *Window) openCaptureOverlay(mode CaptureMode, staging string, frames []grab.WindowFrame) {
+	w.openCaptureOverlayOn(mode, staging, frames, monitorRect(w.window))
+}
+
+func (w *Window) openCaptureOverlayOn(mode CaptureMode, staging string, frames []grab.WindowFrame, mon image.Rectangle) {
 	if w.overlay != nil {
 		w.overlay.close(false)
 	}
@@ -75,22 +84,40 @@ func (w *Window) openCaptureOverlay(mode CaptureMode, staging string) {
 		selected:      -1,
 		magnifierSize: defaultMagnifier,
 	}
-	if mode != CaptureArea {
+	switch mode {
+	case CaptureScreen:
 		size := doc.Size()
 		ov.selection = image.Rect(0, 0, size.X, size.Y)
+	case CaptureWindow:
+		if mon.Empty() {
+			mon = monitorRect(w.window)
+		}
+		ov.frames = mapWindowFrames(frames, doc.Size(), mon)
 	}
 	ov.build()
 	ov.refreshSurface()
 	w.overlay = ov
 
 	width, height, monitor := displayBounds(w.window)
-	ov.coverMonitor(width, height)
-	if monitor != nil {
-		ov.window.FullscreenOnMonitor(monitor)
-	} else {
-		ov.window.Fullscreen()
+	if !mon.Empty() {
+		width, height = mon.Dx(), mon.Dy()
 	}
+	ov.coverMonitor(width, height)
 	ov.window.Present()
+	if monitor != nil {
+		glib.TimeoutAdd(80, func() bool {
+			if ov.window == nil {
+				return false
+			}
+			if !ov.window.IsFullscreen() {
+				ov.window.FullscreenOnMonitor(monitor)
+			}
+			if ov.canvas != nil {
+				ov.canvas.QueueDraw()
+			}
+			return false
+		})
+	}
 	w.window.SetVisible(false)
 }
 
@@ -106,8 +133,9 @@ func (o *captureOverlay) build() {
 	o.window.SetDeletable(false)
 	o.window.SetModal(true)
 	o.window.ConnectMap(func() {
-		if !o.window.IsFullscreen() {
-			o.window.Fullscreen()
+		if o.canvas != nil {
+			o.canvas.GrabFocus()
+			o.canvas.QueueDraw()
 		}
 	})
 	o.window.ConnectCloseRequest(func() bool {
@@ -117,6 +145,7 @@ func (o *captureOverlay) build() {
 
 	keysCtl := gtk.NewEventControllerKey()
 	keysCtl.SetPropagationPhase(gtk.PhaseCapture)
+	keysCtl.SetPropagationLimit(gtk.LimitNone)
 	keysCtl.ConnectKeyPressed(func(keyval, keycode uint, state gdk.ModifierType) bool {
 		if o.text.active() {
 			if keyval == gdk.KEY_Escape {
@@ -135,15 +164,27 @@ func (o *captureOverlay) build() {
 	o.canvas = gtk.NewDrawingArea()
 	o.canvas.SetHExpand(true)
 	o.canvas.SetVExpand(true)
-	o.canvas.SetCursorFromName(cursorForTool(o.tool))
+	o.canvas.SetFocusable(true)
+	o.canvas.SetCursorFromName(o.cursorName())
 	o.canvas.SetDrawFunc(o.draw)
 	o.bindGestures()
 	bindCursorTracking(o.canvas, func(x, y float64) {
 		o.cursorX, o.cursorY = x, y
 		o.cursorIn = true
+		if o.mode == CaptureWindow && !o.windowLocked {
+			next := grab.FrameAt(o.frames, image.Pt(int(o.view.ToImage(x, y).X), int(o.view.ToImage(x, y).Y)))
+			if !next.Eq(o.hovered) {
+				o.hovered = next
+				o.canvas.QueueDraw()
+			}
+		}
 		o.updateLens()
 	}, func() {
 		o.cursorIn = false
+		if !o.hovered.Empty() {
+			o.hovered = image.Rectangle{}
+			o.canvas.QueueDraw()
+		}
 		o.updateLens()
 	}, func(dy float64) {
 		o.magnifierSize = clampMagnifier(o.magnifierSize - dy*18)
@@ -178,6 +219,7 @@ func (o *captureOverlay) buildChrome() *gtk.Box {
 	chrome.SetCSSClasses([]string{"lamha-toolbar"})
 
 	tools := gtk.NewBox(gtk.OrientationHorizontal, 2)
+	tools.SetVAlign(gtk.AlignCenter)
 	o.tools = appendToolToggles(tools, captureTools(), o.tool, iconInkOnDark, o.setTool)
 	chrome.Append(tools)
 
@@ -227,6 +269,18 @@ func (o *captureOverlay) buildChrome() *gtk.Box {
 }
 
 func (o *captureOverlay) hint() string {
+	if o.mode == CaptureWindow {
+		if o.windowLocked || (!o.selection.Empty() && len(o.frames) <= 1) {
+			return i18n.T("Window captured. Save or mark it up.")
+		}
+		if len(o.frames) == 0 {
+			return i18n.T("Could not list windows. Drag to select a window region.")
+		}
+		if o.selection.Empty() {
+			return i18n.T("Click a window to select it. Save captures that window.")
+		}
+		return i18n.T("Window selected. Save to capture it, or click another.")
+	}
 	if o.mode == CaptureArea && o.selection.Empty() {
 		return i18n.T("Drag to select. Scroll zooms the lens. Shortcuts are editable in the main window.")
 	}
@@ -316,6 +370,12 @@ func (o *captureOverlay) bindGestures() {
 				o.canvas.QueueDraw()
 				return
 			}
+			if o.mode == CaptureWindow && o.tool == annotate.ToolSelect && !o.windowLocked {
+				if frame := grab.FrameAt(o.frames, image.Pt(int(start.X), int(start.Y))); !frame.Empty() {
+					o.lockWindow(frame)
+					return
+				}
+			}
 			if o.tool == annotate.ToolMove {
 				if o.selected >= 0 {
 					o.moving = true
@@ -382,7 +442,7 @@ func (o *captureOverlay) bindGestures() {
 		if o.moving {
 			o.moving = false
 			o.refreshSurface()
-			o.canvas.SetCursorFromName(cursorForTool(o.tool))
+			o.canvas.SetCursorFromName(o.cursorName())
 			o.canvas.QueueDraw()
 			o.status.SetText(i18n.Tf("Moved the selected mark. Arrow keys nudge. %s.", withKey(i18n.T("Duplicate"), keys.Duplicate)))
 			return
@@ -391,6 +451,9 @@ func (o *captureOverlay) bindGestures() {
 			o.selecting = false
 			if o.selection.Dx() < 2 || o.selection.Dy() < 2 {
 				o.selection = image.Rectangle{}
+			} else if o.mode == CaptureWindow && !o.windowLocked {
+				o.lockWindow(o.selection)
+				return
 			}
 			o.status.SetText(o.hint())
 			o.canvas.QueueDraw()
@@ -435,7 +498,11 @@ func (o *captureOverlay) draw(_ *gtk.DrawingArea, cr *cairo.Context, width, heig
 	size := o.doc.Size()
 	o.view = annotate.Fit(size.X, size.Y, width, height)
 
-	cr.SetSourceRGB(0.05, 0.05, 0.06)
+	if o.mode == CaptureWindow {
+		cr.SetSourceRGB(0, 0, 0)
+	} else {
+		cr.SetSourceRGB(0.05, 0.05, 0.06)
+	}
 	cr.Paint()
 	if o.surface == nil {
 		return
@@ -445,6 +512,9 @@ func (o *captureOverlay) draw(_ *gtk.DrawingArea, cr *cairo.Context, width, heig
 	cr.Translate(o.view.OffsetX, o.view.OffsetY)
 	cr.Scale(o.view.Scale, o.view.Scale)
 	paintSurface(cr, o.surface, cairo.FilterNearest)
+	if o.mode == CaptureWindow && !o.windowLocked && !o.hovered.Empty() && o.hovered != o.selection {
+		drawWindowHover(cr, o.hovered)
+	}
 	drawSelectionMask(cr, size, o.selection)
 	if stroke, ok := o.doc.Stroke(o.selected); ok {
 		if o.moving {
@@ -596,7 +666,7 @@ func (o *captureOverlay) setTool(tool annotate.Tool) {
 		o.tools.activate(tool)
 	}
 	if o.canvas != nil {
-		o.canvas.SetCursorFromName(cursorForTool(tool))
+		o.canvas.SetCursorFromName(o.cursorName())
 		o.canvas.QueueDraw()
 	}
 }
@@ -719,6 +789,11 @@ func (o *captureOverlay) deleteSelected() {
 }
 
 func (o *captureOverlay) undo() {
+	if o.draft != nil {
+		o.draft = nil
+		o.canvas.QueueDraw()
+		return
+	}
 	if !o.doc.Undo() {
 		return
 	}
@@ -803,10 +878,53 @@ func (o *captureOverlay) dismiss(after func()) {
 		}
 		return
 	}
+	win.SetVisible(false)
 	win.Destroy()
 	if after != nil {
 		after()
 	}
+}
+
+func (o *captureOverlay) lockWindow(frame image.Rectangle) {
+	if o.windowLocked || o.staging == "" || frame.Empty() {
+		o.selection = frame
+		o.hovered = frame
+		o.selecting = false
+		o.draft = nil
+		o.status.SetText(o.hint())
+		o.canvas.QueueDraw()
+		return
+	}
+	if err := grab.CropPNG(o.staging, frame); err != nil {
+		log.Printf("window crop: %v", err)
+		o.selection = frame
+		o.hovered = frame
+		o.selecting = false
+		o.draft = nil
+		o.status.SetText(o.hint())
+		o.canvas.QueueDraw()
+		return
+	}
+	doc, err := annotate.Open(o.staging)
+	if err != nil {
+		log.Printf("window crop reload: %v", err)
+		o.selection = frame
+		o.status.SetText(o.hint())
+		o.canvas.QueueDraw()
+		return
+	}
+	o.doc = doc
+	o.frames = nil
+	o.hovered = image.Rectangle{}
+	o.windowLocked = true
+	o.selecting = false
+	o.draft = nil
+	size := doc.Size()
+	o.selection = image.Rect(0, 0, size.X, size.Y)
+	o.refreshSurface()
+	o.canvas.SetCursorFromName(o.cursorName())
+	o.status.SetText(o.hint())
+	o.canvas.QueueDraw()
 }
 
 func (o *captureOverlay) coverMonitor(width, height int) {
@@ -818,6 +936,49 @@ func (o *captureOverlay) coverMonitor(width, height int) {
 		width, height = 1920, 1080
 	}
 	o.window.SetDefaultSize(width, height)
+}
+
+func (o *captureOverlay) cursorName() string {
+	if o.mode == CaptureWindow && o.tool == annotate.ToolSelect && len(o.frames) > 1 {
+		return "pointer"
+	}
+	return cursorForTool(o.tool)
+}
+
+func mapWindowFrames(frames []grab.WindowFrame, img image.Point, monitor image.Rectangle) []image.Rectangle {
+	out := make([]image.Rectangle, 0, len(frames))
+	for _, frame := range frames {
+		r := grab.MapToImage(frame.Bounds, img, monitor)
+		if r.Dx() >= 32 && r.Dy() >= 32 {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+func monitorRect(win *gtk.ApplicationWindow) image.Rectangle {
+	_, _, monitor := displayBounds(win)
+	if monitor == nil {
+		return image.Rectangle{}
+	}
+	geo := monitor.Geometry()
+	if geo == nil {
+		return image.Rectangle{}
+	}
+	return image.Rect(geo.X(), geo.Y(), geo.X()+geo.Width(), geo.Y()+geo.Height())
+}
+
+func drawWindowHover(cr *cairo.Context, r image.Rectangle) {
+	if r.Empty() {
+		return
+	}
+	cr.SetSourceRGBA(0.21, 0.52, 0.96, 0.16)
+	cr.Rectangle(float64(r.Min.X), float64(r.Min.Y), float64(r.Dx()), float64(r.Dy()))
+	cr.Fill()
+	cr.SetSourceRGB(0.45, 0.72, 1)
+	cr.SetLineWidth(2 / maxFloat(crScale(cr), 0.5))
+	cr.Rectangle(float64(r.Min.X)+0.5, float64(r.Min.Y)+0.5, float64(r.Dx()-1), float64(r.Dy()-1))
+	cr.Stroke()
 }
 
 func displayBounds(win *gtk.ApplicationWindow) (int, int, *gdk.Monitor) {

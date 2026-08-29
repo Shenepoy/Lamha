@@ -10,6 +10,12 @@ func TestMatchAccel(t *testing.T) {
 	if !matchAccel("<Control>z", gdk.KEY_z, gdk.ControlMask) {
 		t.Fatal("Ctrl+Z did not match")
 	}
+	if !matchAccel("<Primary>z", gdk.KEY_z, gdk.ControlMask) {
+		t.Fatal("Primary+Z did not match Ctrl+Z")
+	}
+	if !matchAccel("<Control>z", gdk.KEY_Z, gdk.ControlMask) {
+		t.Fatal("Ctrl+Z did not match uppercase Z")
+	}
 	if matchAccel("<Control>z", gdk.KEY_z, 0) {
 		t.Fatal("Z matched Ctrl+Z")
 	}

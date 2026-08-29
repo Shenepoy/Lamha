@@ -25,6 +25,8 @@
 </p>
 
 <p align="center">
+  <a href="#لقطات">لقطات</a>
+  ·
   <a href="#ماذا-تقدّم">ماذا تقدّم؟</a>
   ·
   <a href="#التثبيت">التثبيت</a>
@@ -40,6 +42,30 @@
   الاسم من العربية: <strong>لمحة</strong>
   (<span dir="ltr"><em>lamḥa</em></span>) — نظرة سريعة تلتقط الشاشة.<br/>
   والاسم اللاتيني <span dir="ltr"><strong>Lamha</strong></span> مأخوذ منه.
+</p>
+
+</div>
+
+---
+
+<div dir="rtl" lang="ar">
+
+## لقطات
+
+<p align="center">
+  <img src="screenshots/Image1.png" alt="الرئيسية — السجل والمعاينة" width="640" />
+</p>
+
+<p align="center">
+  <img src="screenshots/Image2.png" alt="التحرير — الأدوات والألوان وسمك الخط" width="640" />
+</p>
+
+<p align="center">
+  <img src="screenshots/Image3.png" alt="شريط أدوات طبقة الالتقاط — الأدوات والألوان وسمك الخط" width="720" />
+</p>
+
+<p align="center">
+  <sub>الرئيسية · التحرير · شريط الطبقة</sub>
 </p>
 
 </div>
@@ -80,6 +106,16 @@
 <div dir="rtl" lang="ar">
 
 ## التثبيت
+
+### إصدارات GitHub
+
+البناء الموسوم ينشر ثنائي لينكس وAppImage:
+
+- [أحدث إصدار](https://github.com/Zyzto/Lamha/releases/latest)
+- `lamha-YY.0M.MICRO-linux-x86_64` — ثنائي مستقل (يحتاج GTK 4 على الجهاز)
+- `Lamha-YY.0M.MICRO-x86_64.AppImage` — GTK 4 مضمّن
+
+اجعل الـ AppImage قابلاً للتنفيذ ثم شغّله. الإصدارات تقويمية مثل الجَنَان: `YY.0M.MICRO` (أول إصدار في أغسطس 2026 هو `26.08.0`). الوسم `v26.08.0`. الرقم في ملف `VERSION`.
 
 ### من المصدر
 
@@ -137,7 +173,17 @@ lamha --capture=screen
 make test
 make build
 make fmt
+lamha --version
 ```
+
+لنشر إصدار: حدّث `VERSION` (أو `bash scripts/ci/next_version.sh`) ثم:
+
+```bash
+git tag v26.08.0
+git push origin v26.08.0
+```
+
+Actions تختبر وتبني الثنائي والـ AppImage وترفقهما بإصدار GitHub.
 
 </div>
 

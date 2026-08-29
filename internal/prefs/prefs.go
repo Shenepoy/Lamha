@@ -13,11 +13,21 @@ const (
 	DefaultMagnifierZoom = 5.0
 	MinMagnifierZoom     = 2.0
 	MaxMagnifierZoom     = 10.0
+
+	ThemeSystem = "system"
+	ThemeLight  = "light"
+	ThemeDark   = "dark"
+
+	LanguageSystem  = "system"
+	LanguageEnglish = "en"
+	LanguageArabic  = "ar"
 )
 
 // Settings is the persisted preference file.
 type Settings struct {
 	MagnifierZoom float64 `json:"magnifier_zoom"`
+	Theme         string  `json:"theme"`
+	Language      string  `json:"language"`
 }
 
 // Store is the process-wide preference file.
@@ -40,6 +50,8 @@ func Load() *Store {
 			var raw Settings
 			if json.Unmarshal(data, &raw) == nil {
 				live.current.MagnifierZoom = ClampZoom(raw.MagnifierZoom)
+				live.current.Theme = NormalizeTheme(raw.Theme)
+				live.current.Language = NormalizeLanguage(raw.Language)
 			}
 		}
 	})
@@ -72,6 +84,48 @@ func (s *Store) SetMagnifierZoom(zoom float64) error {
 	return s.save()
 }
 
+// Theme is system, light, or dark.
+func (s *Store) Theme() string {
+	if s == nil {
+		return ThemeSystem
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return NormalizeTheme(s.current.Theme)
+}
+
+// SetTheme writes and persists the color scheme.
+func (s *Store) SetTheme(theme string) error {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	s.current.Theme = NormalizeTheme(theme)
+	s.mu.Unlock()
+	return s.save()
+}
+
+// Language is system, en, or ar.
+func (s *Store) Language() string {
+	if s == nil {
+		return LanguageSystem
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return NormalizeLanguage(s.current.Language)
+}
+
+// SetLanguage writes and persists the UI language.
+func (s *Store) SetLanguage(language string) error {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	s.current.Language = NormalizeLanguage(language)
+	s.mu.Unlock()
+	return s.save()
+}
+
 // ClampZoom keeps magnification inside the supported range.
 func ClampZoom(zoom float64) float64 {
 	if zoom == 0 {
@@ -97,7 +151,31 @@ func (s *Store) save() error {
 }
 
 func defaults() Settings {
-	return Settings{MagnifierZoom: DefaultMagnifierZoom}
+	return Settings{
+		MagnifierZoom: DefaultMagnifierZoom,
+		Theme:         ThemeSystem,
+		Language:      LanguageSystem,
+	}
+}
+
+// NormalizeTheme accepts system, light, or dark.
+func NormalizeTheme(theme string) string {
+	switch theme {
+	case ThemeLight, ThemeDark:
+		return theme
+	default:
+		return ThemeSystem
+	}
+}
+
+// NormalizeLanguage accepts system, en, or ar.
+func NormalizeLanguage(language string) string {
+	switch language {
+	case LanguageEnglish, LanguageArabic:
+		return language
+	default:
+		return LanguageSystem
+	}
 }
 
 func configPath() string {
