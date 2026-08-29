@@ -4,6 +4,11 @@ gtk4>=4.22
 libglib>=2.86
 glib
 zlib
+expat
+libpng
+freetype
+libffi
+pcre2
 gdk-pixbuf
 librsvg
 pkgconf

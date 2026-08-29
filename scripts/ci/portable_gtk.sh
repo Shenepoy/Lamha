@@ -25,9 +25,11 @@ if [[ ! -x "$MAMBA_BIN" ]]; then
   rm -rf "$tmp"
 fi
 
-if [[ ! -x "$PREFIX/bin/pkg-config" ]]; then
-  mapfile -t specs < <(grep -vE '^[[:space:]]*(#|$)' "$SPEC")
+mapfile -t specs < <(grep -vE '^[[:space:]]*(#|$)' "$SPEC")
+if [[ ! -f "$PREFIX/conda-meta/history" ]]; then
   "$MAMBA_BIN" create -y -p "$PREFIX" -c conda-forge "${specs[@]}"
+else
+  "$MAMBA_BIN" install -y -p "$PREFIX" -c conda-forge "${specs[@]}"
 fi
 
 pc_path="$PREFIX/lib/pkgconfig:${PREFIX}/share/pkgconfig"
@@ -44,10 +46,26 @@ pc="$PREFIX/bin/pkg-config"
 if [[ ! -x "$pc" ]]; then
   pc="$PREFIX/bin/pkgconf"
 fi
+
+# gtk4.pc Requires.private many modules whose conda runtime packages omit .pc files.
+for _ in $(seq 1 25); do
+  if "$pc" --exists gtk4 glib-2.0 2>/dev/null; then
+    break
+  fi
+  err="$("$pc" --exists --print-errors gtk4 glib-2.0 2>&1 || true)"
+  echo "$err"
+  missing="$(printf '%s\n' "$err" | sed -n "s/.*Package '\\([^']*\\)', required by.*/\\1/p" | head -n 1)"
+  if [[ -z "$missing" ]]; then
+    echo "conda GTK prefix is missing gtk4 or glib-2.0 pkg-config files" >&2
+    exit 1
+  fi
+  echo "installing pkg-config module $missing"
+  if ! "$MAMBA_BIN" install -y -p "$PREFIX" -c conda-forge "$missing"; then
+    "$MAMBA_BIN" install -y -p "$PREFIX" -c conda-forge "lib${missing}"
+  fi
+done
 if ! "$pc" --exists --print-errors gtk4 glib-2.0; then
   echo "conda GTK prefix is missing gtk4 or glib-2.0 pkg-config files" >&2
-  echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >&2
-  find "$PREFIX" -name '*.pc' -print >&2 || true
   exit 1
 fi
 
