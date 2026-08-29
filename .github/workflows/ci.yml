@@ -22,7 +22,8 @@ env:
 jobs:
   test-and-build:
     name: Test & Binary
-    runs-on: ubuntu-24.04
+    # gotk4 v0.4.1 needs GLib 2.86+; Ubuntu 24.04 ships 2.80.
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -47,6 +48,7 @@ jobs:
       - name: Build binary
         run: |
           version="${{ steps.ver.outputs.name }}"
+          mkdir -p dist
           go build -trimpath -ldflags "-s -w -X github.com/lamha-app/lamha/internal/version.Version=${version}" \
             -o "dist/lamha-${version}-linux-x86_64" ./cmd/lamha
           chmod +x "dist/lamha-${version}-linux-x86_64"
