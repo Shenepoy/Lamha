@@ -1,0 +1,31 @@
+[Desktop Entry]
+Type=Application
+Name=Lamha
+Name[ar]=لمحة
+Comment=Wayland-native screenshot capture
+Comment[ar]=التقاط لقطات شاشة أصلي لويلاند
+Exec=lamha
+Icon=io.github.lamha.Lamha
+Terminal=false
+Categories=Utility;Graphics;GTK;
+Keywords=screenshot;capture;screen;wayland;sharex;
+StartupNotify=true
+DBusActivatable=true
+X-GNOME-UsesNotifications=true
+X-KDE-DBUS-Restricted-Interfaces=org.kde.kwin.Screenshot;org.kde.KWin.ScreenShot2
+Actions=CaptureArea;CaptureWindow;CaptureScreen;
+
+[Desktop Action CaptureArea]
+Name=Capture area
+Name[ar]=التقاط منطقة
+Exec=lamha --capture=area
+
+[Desktop Action CaptureWindow]
+Name=Capture window
+Name[ar]=التقاط نافذة
+Exec=lamha --capture=window
+
+[Desktop Action CaptureScreen]
+Name=Capture screen
+Name[ar]=التقاط الشاشة
+Exec=lamha --capture=screen

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.lamha.Lamha</id>
+  <name>Lamha</name>
+  <summary>A secure, cross-desktop screenshot tool</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>Lamha is a GTK4 screenshot tool for Wayland Linux desktops. It uses the XDG Desktop Portal so capture and selection work with GNOME and KDE Plasma.</p>
+    <p>It can capture an area, a window, or a screen, delay the shot, annotate with pen, box, highlight, blur, steps, and magic erase, copy the image to the clipboard, and keep a local history.</p>
+  </description>
+  <launchable type="desktop-id">io.github.lamha.Lamha.desktop</launchable>
+  <provides>
+    <binary>lamha</binary>
+  </provides>
+  <categories>
+    <category>Utility</category>
+    <category>Graphics</category>
+  </categories>
+</component>
