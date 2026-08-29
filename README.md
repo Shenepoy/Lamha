@@ -1,99 +1,159 @@
-# Lamha
+<!-- markdownlint-disable MD033 MD060 -->
 
-Lamha is a GTK4 screenshot application written in Go for Linux. It takes a
-silent fullscreen snapshot through GNOME Shell, KWin, or Spectacle, then opens
-Lamha's own overlay for selection and markup. It does not launch the GNOME or
-KDE screenshot picker.
+<p align="center">
+  <img src="internal/brand/logo.svg" alt="Lamha" width="200" />
+</p>
 
-## What works now
+<h1 align="center">Lamha - لمحة</h1>
 
-- Freeze the screen and open Lamha's capture overlay
-- Select an area, then annotate with pen, box, highlight, blur, numbered steps, and magic erase
-- Delay a capture so menus and hover states can appear
-- Hide the Lamha window before the shot so it is not included
-- Save from the overlay or reopen **Annotate** later on a saved capture
-- Copy to the clipboard when saving, if that option is checked
-- Preview the latest image, browse local history, and copy to the clipboard
-- Save captures in `$XDG_DATA_HOME/lamha/captures` (normally `~/.local/share/lamha/captures`)
-- Start a capture from the command line or a desktop action
-- Run on Wayland GNOME and KDE Plasma without compositor-specific shell commands
+<p align="center">
+  <strong>Freeze the screen. Mark what matters.</strong><br/>
+  A silent screenshot, then Lamha’s own overlay for select and markup —<br/>
+  no GNOME or KDE picker. Go · GTK4 · Wayland.
+</p>
 
-On GNOME the grab uses `org.gnome.Shell.Screenshot`. On Plasma it uses KWin or
-a background Spectacle call. The XDG Screenshot portal is only a silent
-fallback, never the interactive picker. The first time GNOME may ask for
-screenshot permission; that is not the GNOME capture UI.
+<p align="center">
+  <a href="https://github.com/lamha-app/lamha"><img alt="repo" src="https://img.shields.io/badge/github-lamha--app%2Flamha-C0C0C0?style=flat-square" /></a>
+  <img alt="go" src="https://img.shields.io/badge/Go-1.26-C0C0C0?style=flat-square&logo=go&logoColor=white" />
+  <img alt="gtk" src="https://img.shields.io/badge/GTK-4-7C2AA8?style=flat-square" />
+  <img alt="wayland" src="https://img.shields.io/badge/Wayland-GNOME%20%2B%20Plasma-7C2AA8?style=flat-square" />
+  <img alt="license" src="https://img.shields.io/badge/license-GPL--3.0--or--later-7C2AA8?style=flat-square" />
+</p>
 
-## Run it
+<p align="center">
+  <a href="#what-you-get">What you get</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#develop">Develop</a> ·
+  <a href="#architecture-short">Architecture</a> ·
+  <a href="README.ar.md">العربية</a>
+</p>
 
-GTK4 development headers and `pkg-config` are required. On NixOS (or with Nix
-installed), the included shell supplies them:
+<p align="center">
+  The name <strong>Lamha</strong> comes from Arabic
+  <span dir="rtl"><strong>لمحة</strong></span>
+  (<em>lamḥa</em>): a glance / a glimpse —
+  catch the screen in one look.
+</p>
 
-```sh
+---
+
+## What you get
+
+| | |
+|---|---|
+| **Silent grab** | Freezes the display through GNOME Shell, KWin, or Spectacle. The interactive portal picker is never launched. |
+| **Select** | Area, window, or full screen — after the freeze, in Lamha’s overlay. |
+| **Markup** | Pen, arrow, box, ellipse, highlight, blur, numbered steps, text, magic erase, area erase. |
+| **Move & restyle** | Drag marks, restyle them, undo / redo, duplicate, delete. |
+| **Lens** | A circular magnifier under the pointer. Scroll changes size; Settings sets zoom (2×–10×). |
+| **Stay in back** | Close the window to hide it. Capture from the tray, system shortcuts, or `lamha --capture=`. |
+| **History** | Local captures, preview, copy, reopen **Annotate**, optional copy-on-save. |
+| **Locales** | English and Arabic (RTL). |
+
+**Capture modes**
+
+| Mode | Behaviour |
+|------|-----------|
+| **Area** | Freeze, then drag a region and mark it up. |
+| **Window** | Freeze, then select a window rectangle. |
+| **Screen** | Freeze the whole display and mark it up. |
+
+A delay (1–10 seconds) can wait for menus and hover states. The first time on GNOME, the session may ask for screenshot permission — that is not the GNOME capture UI.
+
+Captures land in `$XDG_DATA_HOME/lamha/captures` (usually `~/.local/share/lamha/captures`).
+
+---
+
+## Install
+
+### From source
+
+Install `bin/lamha` on `PATH`, then:
+
+| File | Destination |
+|------|-------------|
+| `data/io.github.lamha.Lamha.desktop` | `~/.local/share/applications/` |
+| `data/icons/hicolor/scalable/apps/io.github.lamha.Lamha.svg` | `~/.local/share/icons/hicolor/scalable/apps/` |
+
+On GNOME, bind keys in Settings → Keyboard, or open **Shortcuts** in Lamha. Plasma: System Settings → Shortcuts.
+
+### AppImage
+
+Needs Go, GTK4 development files, `pkg-config`, and `curl`:
+
+```bash
+make appimage
+```
+
+The script pulls [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy) and writes a bundle under `dist/`. GTK4 bundling is most reliable on a regular FHS distro (Fedora, Ubuntu). On NixOS, build the AppImage from a container or another Linux system if linuxdeploy cannot collect host libraries.
+
+---
+
+## Develop
+
+**Requirements:** Go `1.26` · GTK4 · `pkg-config`
+
+On NixOS (or with Nix installed):
+
+```bash
 nix develop
 make run
 ```
 
-Otherwise, install your distribution's GTK4 development package, `pkg-config`,
-and Go, then run:
+Otherwise install your distribution’s GTK4 development package, `pkg-config`, and Go, then:
 
-```sh
+```bash
 go run ./cmd/lamha
 ```
 
-Capture without opening the window first:
+Capture without opening the window first (forwarded to a running instance):
 
-```sh
+```bash
 lamha --capture=area
 lamha --capture=window
 lamha --capture=screen
 ```
 
-If Lamha is already running, the same commands are forwarded to that instance.
-
-Bind a desktop hotkey to one of those commands in GNOME Settings → Keyboard, or
-KDE System Settings → Shortcuts. Right-clicking the application launcher also
-exposes the same actions.
-
-## AppImage
-
-Build a portable bundle after installing Go, GTK4 development files, `pkg-config`,
-and `curl`:
-
-```sh
-make appimage
+```bash
+make test
+make build
+make fmt
 ```
 
-The script downloads [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy)
-and its GTK plugin, then writes an AppImage under `dist/`. GTK4 bundling is most
-reliable on a regular FHS distribution such as Fedora or Ubuntu. On NixOS, build
-the AppImage from a container or another Linux system if linuxdeploy cannot
-collect host libraries.
+---
 
-## Architecture
+## Architecture (short)
+
+- **UI** — GTK4 (gotk4), overlay + editor, Arabic via `internal/i18n`
+- **Grab** — GNOME Shell D-Bus → gnome-screenshot → KWin → Spectacle → silent portal
+- **Markup** — `internal/annotate` document (undo, hit-test, raster cache)
+- **Tray** — StatusNotifierItem + DBusMenu
+- **Prefs / keys** — `~/.config/lamha/`
 
 ```text
-GTK4 UI / CLI / desktop actions
+Tray / CLI / desktop actions
         ↓
 Silent grab (GNOME Shell / KWin / Spectacle)
         ↓
-Lamha capture overlay (select + pen/box/highlight/blur/steps/erase)
+Lamha overlay (select + markup)
         ↓
 preview / clipboard / local history
 ```
 
-This is intentionally a solid capture foundation rather than a claim to have
-all of ShareX's feature set. The next useful milestones are upload destinations,
-history search, and Portal Global Shortcuts.
+This is a solid capture foundation, not a claim to ShareX’s full set. Useful next steps are upload destinations and history search.
 
-## Verify
+---
 
-```sh
-make fmt
-make test
-make build
-```
+## License
 
-For a user installation, install `bin/lamha` on `PATH`, copy
-`data/io.github.lamha.Lamha.desktop` to `~/.local/share/applications/`, and copy
-`data/icons/hicolor/scalable/apps/io.github.lamha.Lamha.svg` (from `Logo.svg`) to
-`~/.local/share/icons/hicolor/scalable/apps/`.
+[GPL-3.0-or-later](https://www.gnu.org/licenses/gpl-3.0.html) — as declared in the AppStream metadata.
+
+The name **Lamha**, the Arabic wordmark <span dir="rtl">**لمحة**</span>, and the logo are not a free-for-all brand. Fork the code, but please ship a fork under a different name and icon.
+
+---
+
+<p align="center">
+  Made by <a href="https://shenepoy.com"><strong>shenepoy</strong></a>
+  ·
+  <a href="https://github.com/Zyzto">GitHub</a>
+</p>

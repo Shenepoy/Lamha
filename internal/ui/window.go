@@ -112,12 +112,6 @@ func (w *Window) build() {
 
 	header := gtk.NewHeaderBar()
 	header.SetShowTitleButtons(true)
-	titleBox := gtk.NewBox(gtk.OrientationHorizontal, 8)
-	titleBox.Append(brand.Image(28))
-	appName := gtk.NewLabel("Lamha")
-	appName.SetCSSClasses([]string{"title-3"})
-	titleBox.Append(appName)
-	header.SetTitleWidget(titleBox)
 	shortcutBtn := gtk.NewButtonWithLabel(i18n.T("Shortcuts"))
 	shortcutBtn.SetTooltipText(i18n.T("Edit capture and markup keyboard shortcuts"))
 	shortcutBtn.ConnectClicked(w.openShortcutSettings)
