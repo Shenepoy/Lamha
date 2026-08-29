@@ -9,6 +9,13 @@
     <p>Lamha is a GTK4 screenshot tool for Wayland Linux desktops. It uses the XDG Desktop Portal so capture and selection work with GNOME and KDE Plasma.</p>
     <p>It can capture an area, a window, or a screen, delay the shot, annotate with pen, box, highlight, blur, steps, and magic erase, copy the image to the clipboard, and keep a local history.</p>
   </description>
+  <developer_name>Shenepoy</developer_name>
+  <developer id="io.github.zyzto">
+    <name>Shenepoy</name>
+  </developer>
+  <url type="homepage">https://github.com/Zyzto/Lamha</url>
+  <url type="bugtracker">https://github.com/Zyzto/Lamha/issues</url>
+  <url type="vcs-browser">https://github.com/Zyzto/Lamha</url>
   <launchable type="desktop-id">io.github.lamha.Lamha.desktop</launchable>
   <provides>
     <binary>lamha</binary>
@@ -17,7 +24,16 @@
     <category>Utility</category>
     <category>Graphics</category>
   </categories>
+  <custom>
+    <value key="X-AppImage-UpdateInformation">gh-releases-zsync|Zyzto|Lamha|latest|Lamha-*x86_64.AppImage.zsync</value>
+  </custom>
   <releases>
+    <release version="26.08.4" date="2026-08-29">
+      <url>https://github.com/Zyzto/Lamha/releases/tag/v26.08.4</url>
+      <description>
+        <p>Portable AppImage for glibc 2.35+ with AppImageUpdate metadata.</p>
+      </description>
+    </release>
     <release version="26.08.0" date="2026-08-29">
       <description>
         <p>Initial public release.</p>

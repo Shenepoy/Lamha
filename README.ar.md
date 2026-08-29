@@ -115,7 +115,7 @@
 - `lamha-YY.0M.MICRO-linux-x86_64` — ثنائي مستقل (يحتاج GTK 4.22+ وGLib 2.86+ على الجهاز)
 - `Lamha-YY.0M.MICRO-x86_64.AppImage` — GTK 4 مضمّن؛ يحتاج glibc 2.35+ (أوبونتو 22.04 وفيدورا 36 وديبيان 12 وما بعد)
 
-اجعل الـ AppImage قابلاً للتنفيذ ثم شغّله. الإصدارات تقويمية مثل الجَنَان: `YY.0M.MICRO` (أول إصدار في أغسطس 2026 هو `26.08.0`). الوسم `v26.08.0`. الرقم في ملف `VERSION`.
+اجعل الـ AppImage قابلاً للتنفيذ ثم شغّله. يستطيع [AppImageUpdate](https://github.com/AppImage/AppImageUpdate) متابعة `https://github.com/Zyzto/Lamha/releases/latest`. الإصدارات تقويمية مثل الجَنَان: `YY.0M.MICRO` (أول إصدار في أغسطس 2026 هو `26.08.0`). الوسم `v26.08.0`. الرقم في ملف `VERSION`.
 
 ### من المصدر
 

@@ -13,6 +13,7 @@ StartupNotify=true
 DBusActivatable=true
 X-GNOME-UsesNotifications=true
 X-KDE-DBUS-Restricted-Interfaces=org.kde.kwin.Screenshot;org.kde.KWin.ScreenShot2
+X-AppImage-UpdateInformation=gh-releases-zsync|Zyzto|Lamha|latest|Lamha-*x86_64.AppImage.zsync
 Actions=CaptureArea;CaptureWindow;CaptureScreen;
 
 [Desktop Action CaptureArea]

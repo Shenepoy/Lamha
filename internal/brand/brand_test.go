@@ -34,6 +34,15 @@ func TestLogoSVG(t *testing.T) {
 	if SourceURL != "https://github.com/Zyzto/Lamha" {
 		t.Fatalf("SourceURL = %q", SourceURL)
 	}
+	if UpdateURL != SourceURL+"/releases/latest" {
+		t.Fatalf("UpdateURL = %q", UpdateURL)
+	}
+	if IssuesURL != SourceURL+"/issues" {
+		t.Fatalf("IssuesURL = %q", IssuesURL)
+	}
+	if UpdateInformation != "gh-releases-zsync|Zyzto|Lamha|latest|Lamha-*x86_64.AppImage.zsync" {
+		t.Fatalf("UpdateInformation = %q", UpdateInformation)
+	}
 }
 
 func TestTrayPixbufFillsSlot(t *testing.T) {

@@ -13,4 +13,5 @@ sudo apt-get install -y --no-install-recommends \
   desktop-file-utils \
   binutils \
   xz-utils \
-  bzip2
+  bzip2 \
+  zsync

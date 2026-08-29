@@ -51,9 +51,17 @@ mkdir -p \
   "$appdir/usr/share/icons/hicolor/scalable/apps" \
   "$appdir/usr/share/metainfo"
 
+stamp_desktop() {
+  local dest="$1"
+  cp "$root/data/io.github.lamha.Lamha.desktop" "$dest"
+  if ! grep -q '^X-AppImage-Version=' "$dest"; then
+    printf '\nX-AppImage-Version=%s\n' "$version" >> "$dest"
+  fi
+}
+
 cp "$root/bin/lamha" "$appdir/usr/bin/lamha"
-cp "$root/data/io.github.lamha.Lamha.desktop" "$appdir/usr/share/applications/io.github.lamha.Lamha.desktop"
-cp "$root/data/io.github.lamha.Lamha.desktop" "$appdir/io.github.lamha.Lamha.desktop"
+stamp_desktop "$appdir/usr/share/applications/io.github.lamha.Lamha.desktop"
+stamp_desktop "$appdir/io.github.lamha.Lamha.desktop"
 cp "$root/data/io.github.lamha.Lamha.metainfo.xml" "$appdir/usr/share/metainfo/io.github.lamha.Lamha.metainfo.xml"
 cp "$root/data/icons/hicolor/scalable/apps/io.github.lamha.Lamha.svg" \
   "$appdir/usr/share/icons/hicolor/scalable/apps/io.github.lamha.Lamha.svg"
@@ -76,6 +84,8 @@ fi
 
 export APPIMAGE_EXTRACT_AND_RUN=1
 export DEPLOY_GTK_VERSION=4
+export UPDATE_INFORMATION="gh-releases-zsync|Zyzto|Lamha|latest|Lamha-*x86_64.AppImage.zsync"
+export LDAI_UPDATE_INFORMATION="$UPDATE_INFORMATION"
 export PATH="$(dirname "$plugin"):$PATH"
 
 # linuxdeploy-plugin-gtk copies $libdir/gtk-4.0. GTK 4.20+ may omit that tree.
@@ -106,4 +116,9 @@ if [[ -z "${bundle}" || ! -f "$bundle" ]]; then
 fi
 named="$dist/Lamha-${version}-${arch}.AppImage"
 mv -f "$bundle" "$named"
+if command -v zsyncmake >/dev/null; then
+  zsyncmake -u "https://github.com/Zyzto/Lamha/releases/latest/download/Lamha-${version}-${arch}.AppImage" \
+    -o "${named}.zsync" "$named"
+  echo "zsync written to ${named}.zsync"
+fi
 echo "AppImage written to $named"

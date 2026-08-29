@@ -67,6 +67,8 @@ func aboutContent(centered bool) *gtk.Box {
 	profile := gtk.NewLinkButtonWithLabel(brand.DeveloperProfileURL, i18n.T("View profile"))
 	source := gtk.NewLinkButtonWithLabel(brand.SourceURL, i18n.T("Source Code"))
 	source.SetTooltipText(i18n.T("Browse the app source on GitHub"))
+	updates := gtk.NewLinkButtonWithLabel(brand.UpdateURL, i18n.T("Updates"))
+	updates.SetTooltipText(i18n.T("Check for updates on GitHub"))
 
 	if centered {
 		name.SetHAlign(gtk.AlignCenter)
@@ -77,6 +79,7 @@ func aboutContent(centered bool) *gtk.Box {
 		summary.SetJustify(gtk.JustifyCenter)
 		profile.SetHAlign(gtk.AlignCenter)
 		source.SetHAlign(gtk.AlignCenter)
+		updates.SetHAlign(gtk.AlignCenter)
 	} else {
 		alignStart(name)
 		alignStart(summary)
@@ -87,5 +90,6 @@ func aboutContent(centered bool) *gtk.Box {
 	box.Append(summary)
 	box.Append(profile)
 	box.Append(source)
+	box.Append(updates)
 	return box
 }

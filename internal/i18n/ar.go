@@ -199,4 +199,6 @@ var arabicMessages = map[string]string{
 	"View profile":                       "عرض الملف الشخصي",
 	"Source Code":                        "الشيفرة المصدرية",
 	"Browse the app source on GitHub":    "تصفّح شيفرة التطبيق على GitHub.",
+	"Updates":                            "التحديثات",
+	"Check for updates on GitHub":        "تحقق من التحديثات على GitHub.",
 }

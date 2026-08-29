@@ -103,5 +103,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lamha-appimage
-          path: dist/Lamha-*-x86_64.AppImage
+          path: |
+            dist/Lamha-*-x86_64.AppImage
+            dist/Lamha-*-x86_64.AppImage.zsync
           if-no-files-found: error

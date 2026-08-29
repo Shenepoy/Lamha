@@ -26,6 +26,15 @@ const DeveloperProfileURL = "https://github.com/Zyzto"
 // SourceURL is the public Lamha repository.
 const SourceURL = "https://github.com/Zyzto/Lamha"
 
+// UpdateURL is the GitHub Releases page AppImageUpdate and Settings use.
+const UpdateURL = SourceURL + "/releases/latest"
+
+// IssuesURL is the public bug tracker.
+const IssuesURL = SourceURL + "/issues"
+
+// UpdateInformation is the AppImageUpdate gh-releases-zsync spec.
+const UpdateInformation = "gh-releases-zsync|Zyzto|Lamha|latest|Lamha-*x86_64.AppImage.zsync"
+
 // PanelName is a tray-only icon so the panel does not scale the padded SVG to 16px.
 const PanelName = Name + "-panel"
 

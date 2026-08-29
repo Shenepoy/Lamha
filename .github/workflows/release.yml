@@ -117,7 +117,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-appimage
-          path: dist/Lamha-*-x86_64.AppImage
+          path: |
+            dist/Lamha-*-x86_64.AppImage
+            dist/Lamha-*-x86_64.AppImage.zsync
           if-no-files-found: error
 
   github-release:
@@ -141,6 +143,7 @@ jobs:
           sha256sum \
             "lamha-${{ needs.verify.outputs.version }}-linux-x86_64" \
             "Lamha-${{ needs.verify.outputs.version }}-x86_64.AppImage" \
+            "Lamha-${{ needs.verify.outputs.version }}-x86_64.AppImage.zsync" \
             > sha256sums.txt
 
       - name: Create Release
@@ -152,4 +155,5 @@ jobs:
           files: |
             dist/lamha-*-linux-x86_64
             dist/Lamha-*-x86_64.AppImage
+            dist/Lamha-*-x86_64.AppImage.zsync
             dist/sha256sums.txt

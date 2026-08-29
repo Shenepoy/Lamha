@@ -160,6 +160,10 @@ func (w *Window) buildSettingsBody() *gtk.Box {
 	source := gtk.NewLinkButtonWithLabel(brand.SourceURL, i18n.T("Source Code"))
 	source.SetHAlign(gtk.AlignStart)
 
+	updateHelp := settingsHelp(i18n.T("Check for updates on GitHub"))
+	updates := gtk.NewLinkButtonWithLabel(brand.UpdateURL, i18n.T("Updates"))
+	updates.SetHAlign(gtk.AlignStart)
+
 	ver := gtk.NewLabel("Lamha " + version.String())
 	alignStart(ver)
 	ver.SetMarginTop(12)
@@ -170,6 +174,8 @@ func (w *Window) buildSettingsBody() *gtk.Box {
 	box.Append(aboutBtn)
 	box.Append(sourceHelp)
 	box.Append(source)
+	box.Append(updateHelp)
+	box.Append(updates)
 	box.Append(ver)
 	return box
 }
