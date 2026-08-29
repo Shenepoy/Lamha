@@ -16,11 +16,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/lamha-app/lamha"><img alt="repo" src="https://img.shields.io/badge/github-lamha--app%2Flamha-C0C0C0?style=flat-square" /></a>
+  <a href="https://github.com/Zyzto/Lamha/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/Zyzto/Lamha?style=flat-square&color=7C2AA8" /></a>
+  <a href="https://github.com/Zyzto/Lamha"><img alt="repo" src="https://img.shields.io/badge/github-Zyzto%2FLamha-C0C0C0?style=flat-square" /></a>
   <img alt="go" src="https://img.shields.io/badge/Go-1.26-C0C0C0?style=flat-square&logo=go&logoColor=white" />
   <img alt="gtk" src="https://img.shields.io/badge/GTK-4-7C2AA8?style=flat-square" />
   <img alt="wayland" src="https://img.shields.io/badge/Wayland-GNOME%20%2B%20Plasma-7C2AA8?style=flat-square" />
-  <img alt="license" src="https://img.shields.io/badge/license-GPL--3.0--or--later-7C2AA8?style=flat-square" />
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-AGPL--3.0-7C2AA8?style=flat-square" /></a>
 </p>
 
 <p align="center">
@@ -172,9 +173,11 @@ make fmt
 
 ## الرخصة
 
-[GPL-3.0-or-later](https://www.gnu.org/licenses/gpl-3.0.html) — كما في بيانات AppStream.
+[AGPL-3.0](LICENSE) — استخدم وادرس وعدّل وأعد التوزيع بحرية؛ إن شغّلت نسخة
+معدّلة كخدمة على الشبكة، يحق لمستخدميها الحصول على المصدر.
 
-الاسم **لمحة** والكلمة اللاتينية <span dir="ltr">**Lamha**</span> والشعار ليست علامة حرة للاستخدام. انسخ الشيفرة إن شئت، لكن أصدر الفرع باسم وأيقونة مختلفين.
+الاسم **لمحة** والكلمة اللاتينية <span dir="ltr">**Lamha**</span> والشعار ليست
+مشمولة بتلك الرخصة. انسخ الشيفرة إن شئت، لكن أصدر الفرع باسم وأيقونة مختلفين.
 
 </div>
 
