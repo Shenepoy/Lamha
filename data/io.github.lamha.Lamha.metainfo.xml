@@ -28,6 +28,12 @@
     <value key="X-AppImage-UpdateInformation">gh-releases-zsync|Zyzto|Lamha|latest|Lamha-*x86_64.AppImage.zsync</value>
   </custom>
   <releases>
+    <release version="26.08.6" date="2026-08-30">
+      <url>https://github.com/Zyzto/Lamha/releases/tag/v26.08.6</url>
+      <description>
+        <p>Restore light, dark, and system theme switching in the portable AppImage.</p>
+      </description>
+    </release>
     <release version="26.08.5" date="2026-08-30">
       <url>https://github.com/Zyzto/Lamha/releases/tag/v26.08.5</url>
       <description>

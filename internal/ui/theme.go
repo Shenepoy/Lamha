@@ -14,19 +14,25 @@ func applyTheme(theme string) {
 	if settings == nil {
 		return
 	}
-	// GTK4 equivalent of AdwStyleManager color-scheme:
-	// system → prefer-light unless the desktop prefers dark
-	// light  → force-light
-	// dark   → force-dark
-	// https://gnome.pages.gitlab.gnome.org/libadwaita/doc/main/styles-and-appearance.html
-	switch prefs.NormalizeTheme(theme) {
-	case prefs.ThemeDark:
-		settings.SetObjectProperty("gtk-application-prefer-dark-theme", true)
-	case prefs.ThemeLight:
-		settings.SetObjectProperty("gtk-application-prefer-dark-theme", false)
-	default:
-		settings.SetObjectProperty("gtk-application-prefer-dark-theme", desktopPrefersDark())
+	preferDark, colorScheme := resolveTheme(theme, desktopPrefersDark())
+
+	// GTK 4.20+ themes use prefers-color-scheme media queries. The old
+	// application preference only selects a separate gtk-dark.css variant, so
+	// it does not switch the GTK 4.22 default theme bundled in the AppImage.
+	// Keep both properties in sync for modern and traditional GTK themes.
+	settings.SetObjectProperty("gtk-application-prefer-dark-theme", preferDark)
+	settings.SetObjectProperty("gtk-interface-color-scheme", colorScheme)
+}
+
+func resolveTheme(theme string, desktopDark bool) (bool, gtk.InterfaceColorScheme) {
+	dark := desktopDark
+	if normalized := prefs.NormalizeTheme(theme); normalized != prefs.ThemeSystem {
+		dark = normalized == prefs.ThemeDark
 	}
+	if dark {
+		return true, gtk.InterfaceColorSchemeDark
+	}
+	return false, gtk.InterfaceColorSchemeLight
 }
 
 func styleDim(w gtk.Widgetter) {
