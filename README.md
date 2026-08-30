@@ -42,20 +42,33 @@
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/Image1.png" alt="Home — recent captures and preview" width="640" />
+  <img src="screenshots/Home_Light.png" alt="Home — recent captures and preview" width="640" />
 </p>
 
 <p align="center">
-  <img src="screenshots/Image2.png" alt="Annotate — tools, colors, and stroke" width="640" />
+  <img src="screenshots/Annotate_Light.png" alt="Annotate — tools, colors, and stroke" width="640" />
 </p>
 
 <p align="center">
-  <img src="screenshots/Image3.png" alt="Capture overlay toolbar — tools, colors, and stroke" width="720" />
+  <img src="screenshots/Toolbar.png" alt="Capture overlay toolbar — tools, colors, and stroke" width="720" />
 </p>
 
 <p align="center">
   <sub>Home · Annotate · Overlay toolbar</sub>
 </p>
+
+<details>
+<summary>Dark theme</summary>
+<p align="center">
+  <img src="screenshots/Home_Dark.png" alt="Home — dark" width="640" />
+</p>
+<p align="center">
+  <img src="screenshots/Annotate_Dark.png" alt="Annotate — dark" width="640" />
+</p>
+<p align="center">
+  <sub>Home · Annotate</sub>
+</p>
+</details>
 
 ---
 

@@ -1,11 +1,13 @@
 package annotate
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -120,6 +122,85 @@ func TestRedoRestoresStroke(t *testing.T) {
 	}
 	if doc.Render().NRGBAAt(4, 4).R < 200 {
 		t.Fatal("redo did not restore the box")
+	}
+}
+
+func TestAdjustStepRenumberAndDeleteZero(t *testing.T) {
+	doc := addSteps(solidDoc(160, 40, color.NRGBA{R: 255, G: 255, B: 255, A: 255}), 6)
+	if doc.AdjustStep(2, -1, true, true) < 0 {
+		t.Fatal("minus on 3 should keep that step")
+	}
+	if got := stepNumbers(doc); got != "1,2,3,4,5" {
+		t.Fatalf("reduce 3 to 2 should drop every number and delete 1: %s", got)
+	}
+
+	doc = addSteps(solidDoc(80, 40, color.NRGBA{R: 255, G: 255, B: 255, A: 255}), 3)
+	if doc.AdjustStep(1, 1, true, true) != 1 {
+		t.Fatal("plus should keep the step")
+	}
+	if got := stepNumbers(doc); got != "2,3,4" {
+		t.Fatalf("renumber plus = %s", got)
+	}
+	if doc.AdjustStep(1, -1, true, true) != 1 {
+		t.Fatal("minus should keep that step")
+	}
+	if got := stepNumbers(doc); got != "1,2,3" {
+		t.Fatalf("renumber minus = %s", got)
+	}
+	if doc.AdjustStep(0, -1, true, true) != -1 {
+		t.Fatal("minus to 0 should delete")
+	}
+	if got := stepNumbers(doc); got != "1,2" {
+		t.Fatalf("delete zero + renumber = %s", got)
+	}
+	if doc.NextStep() != 3 {
+		t.Fatalf("NextStep() = %d after delete", doc.NextStep())
+	}
+
+	doc = solidDoc(80, 40, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+	doc.Add(Stroke{Tool: ToolStep, Color: RGB(0x2563eb), Width: 8, X1: 10, Y1: 10})
+	doc.Add(Stroke{Tool: ToolStep, Color: RGB(0x2563eb), Width: 8, X1: 30, Y1: 10})
+	if doc.AdjustStep(0, 1, false, false) != 0 {
+		t.Fatal("isolated plus")
+	}
+	if got := stepNumbers(doc); got != "2,2" {
+		t.Fatalf("no renumber = %s", got)
+	}
+	if doc.AdjustStep(0, -2, false, false) != 0 {
+		t.Fatal("isolated minus to zero")
+	}
+	stroke, ok := doc.Stroke(0)
+	if !ok || stroke.Step != 0 {
+		t.Fatalf("kept zero step: %+v", stroke)
+	}
+}
+
+func addSteps(doc *Document, n int) *Document {
+	for i := 0; i < n; i++ {
+		doc.Add(Stroke{Tool: ToolStep, Color: RGB(0xe11d48), Width: 8, X1: float64(12 + i*20), Y1: 16})
+	}
+	return doc
+}
+
+func stepNumbers(doc *Document) string {
+	parts := make([]string, 0, doc.Len())
+	for i := 0; i < doc.Len(); i++ {
+		stroke, ok := doc.Stroke(i)
+		if !ok || stroke.Tool != ToolStep {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%d", stroke.Step))
+	}
+	return strings.Join(parts, ",")
+}
+
+func TestStepBadgeIsSolid(t *testing.T) {
+	doc := solidDoc(80, 80, color.NRGBA{R: 0, G: 0, B: 0, A: 255})
+	doc.Add(Stroke{Tool: ToolStep, Color: RGB(0xe11d48), Width: 8, X1: 40, Y1: 40})
+	out := doc.Render()
+	rim := out.NRGBAAt(58, 40)
+	if rim.R < 100 || rim.G > 90 {
+		t.Fatalf("step rim = %+v, want a solid red badge", rim)
 	}
 }
 

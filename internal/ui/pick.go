@@ -25,6 +25,10 @@ func (w *Window) StartWindowPick() {
 }
 
 func (w *Window) startWindowCapture(ctx context.Context, delay time.Duration, mon image.Rectangle) {
+	if w.captureTrace == nil {
+		w.captureTrace = newCaptureTrace()
+	}
+	w.captureTrace.log("window", "hide then grab monitor=%v", !mon.Empty())
 	w.hideForCapture()
 
 	if delay > 0 {
@@ -68,6 +72,7 @@ func (w *Window) hideForCapture() {
 		if w.overlay != nil {
 			w.overlay.close(false)
 		}
+		w.parkTransientWindows()
 		w.hidePortalHostLocked()
 		w.window.SetVisible(false)
 		close(done)
@@ -77,15 +82,30 @@ func (w *Window) hideForCapture() {
 }
 
 func (w *Window) grabSilent(ctx context.Context) (string, error) {
-	log.Printf("trying silent compositor grab")
+	if w.captureTrace != nil {
+		w.captureTrace.log("grab", "try compositor")
+	} else {
+		log.Printf("trying silent compositor grab")
+	}
 	staging, err := grab.Fast(ctx)
 	if err == nil && !grab.TooSmall(staging) {
+		if w.captureTrace != nil {
+			w.captureTrace.log("grab", "compositor ok")
+		}
 		return staging, nil
 	}
 	if err != nil {
-		log.Printf("compositor grab unavailable, using desktop portal: %v", err)
+		if w.captureTrace != nil {
+			w.captureTrace.log("grab", "compositor failed: %v", err)
+		} else {
+			log.Printf("compositor grab unavailable, using desktop portal: %v", err)
+		}
 	} else {
-		log.Printf("compositor grab was too small; using desktop portal")
+		if w.captureTrace != nil {
+			w.captureTrace.log("grab", "compositor too small")
+		} else {
+			log.Printf("compositor grab was too small; using desktop portal")
+		}
 		os.Remove(staging)
 	}
 	glib.IdleAdd(func() {
@@ -94,14 +114,24 @@ func (w *Window) grabSilent(ctx context.Context) (string, error) {
 
 	parent := ""
 	if w.windowMapped() {
+		if w.captureTrace != nil {
+			w.captureTrace.log("grab", "export portal parent")
+		}
 		var drop func()
 		parent, drop = w.exportPortalParent(ctx)
 		defer drop()
 	}
-	log.Printf("portal parent=%q", parent)
+	if w.captureTrace != nil {
+		w.captureTrace.log("grab", "silent portal parent=%q mapped=%v", parent, w.windowMapped())
+	} else {
+		log.Printf("portal parent=%q", parent)
+	}
 
 	staging, err = grab.ViaPortal(ctx, portal.ScreenshotOptions{ParentWindow: parent})
 	if err == nil && !grab.TooSmall(staging) {
+		if w.captureTrace != nil {
+			w.captureTrace.log("grab", "silent portal ok")
+		}
 		return staging, nil
 	}
 	if err != nil && errors.Is(err, portal.ErrCancelled) {
@@ -112,14 +142,25 @@ func (w *Window) grabSilent(ctx context.Context) (string, error) {
 		os.Remove(staging)
 	}
 
-	log.Printf("silent portal failed; asking GNOME for permission: %v", err)
+	if w.captureTrace != nil {
+		w.captureTrace.log("grab", "silent portal failed: %v; asking interactively", err)
+	} else {
+		log.Printf("silent portal failed; asking GNOME for permission: %v", err)
+	}
 	glib.IdleAdd(func() {
 		w.status.SetText(i18n.T("GNOME needs one-time permission. Allow the system screenshot dialog."))
+		if !w.window.IsVisible() {
+			w.window.Present()
+		}
 	})
 	w.presentForPortal()
 	parent, drop := w.exportPortalParent(ctx)
 	defer drop()
-	log.Printf("portal parent=%q", parent)
+	if w.captureTrace != nil {
+		w.captureTrace.log("grab", "interactive portal parent=%q", parent)
+	} else {
+		log.Printf("portal parent=%q", parent)
+	}
 	staging, err = grab.ViaPortal(ctx, portal.ScreenshotOptions{
 		ParentWindow: parent,
 		Interactive:  true,
@@ -153,8 +194,14 @@ func (w *Window) windowMapped() bool {
 	glib.IdleAdd(func() {
 		ready <- w.window.Mapped() && w.window.Surface() != nil
 	})
-	return <-ready
+	select {
+	case ok := <-ready:
+		return ok
+	case <-time.After(time.Second):
+		return false
+	}
 }
+
 
 func mapPickerFrames(frames []grab.WindowFrame, mon image.Rectangle) []pickerFrame {
 	out := make([]pickerFrame, 0, len(frames))

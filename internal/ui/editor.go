@@ -13,6 +13,7 @@ import (
 	"github.com/lamha-app/lamha/internal/capture"
 	"github.com/lamha-app/lamha/internal/i18n"
 	"github.com/lamha-app/lamha/internal/keys"
+	"github.com/lamha-app/lamha/internal/prefs"
 )
 
 var editorColors = []struct {
@@ -32,12 +33,16 @@ func colorName(name string) string {
 	return i18n.T(name)
 }
 
+func editorHint() string {
+	return i18n.T("Click a mark to move or restyle it. Double-click text to edit.")
+}
+
 type editor struct {
 	parent        *Window
 	window        *gtk.Window
 	canvas        *gtk.DrawingArea
 	status        *gtk.Label
-	copyOnSave    *gtk.CheckButton
+	copyOnSave    *gtk.ToggleButton
 	undoButton    *gtk.Button
 	redoButton    *gtk.Button
 	stroke        *strokeControl
@@ -62,6 +67,8 @@ type editor struct {
 	text          textInput
 	redraw        redrawPump
 	lens          *magnifierLens
+	stepPop       *stepNumberPop
+	justDragged   bool
 }
 
 func (w *Window) openEditor(path string) {
@@ -92,20 +99,39 @@ func (w *Window) openEditor(path string) {
 	w.editor = ed
 }
 
+func (e *editor) park() {
+	if e == nil || e.window == nil {
+		return
+	}
+	e.hideStepPop()
+	e.window.SetVisible(false)
+}
+
+func (e *editor) unpark() {
+	if e == nil || e.window == nil {
+		return
+	}
+	e.window.Present()
+}
+
 func (e *editor) build() {
-	e.window = gtk.NewWindow()
 	if app := e.parent.window.Application(); app != nil {
-		e.window.SetApplication(app)
+		win := gtk.NewApplicationWindow(app)
+		win.SetResizable(true)
+		e.window = &win.Window
+	} else {
+		e.window = gtk.NewWindow()
+		e.window.SetResizable(true)
 	}
 	e.window.SetTitle(i18n.T("Annotate capture"))
 	e.window.SetIconName(brand.Name)
+	e.window.SetDecorated(true)
+	e.window.SetHideOnClose(false)
 	applyDirection(&e.window.Widget)
 	e.window.SetDefaultSize(1100, 760)
-	e.window.SetTransientFor(&e.parent.window.Window)
-	e.window.SetModal(true)
-	e.window.SetDestroyWithParent(true)
 	e.window.ConnectCloseRequest(func() bool {
 		e.text.cancel()
+		e.hideStepPop()
 		if e.lens != nil {
 			e.lens.hide()
 		}
@@ -121,7 +147,7 @@ func (e *editor) build() {
 			if keyval == gdk.KEY_Escape {
 				e.text.cancel()
 				e.refreshSurface()
-				e.status.SetText(i18n.T("Click a mark to move or restyle it. Double-click text to edit. Scroll resizes the lens. Shortcuts are editable in the main window."))
+				e.status.SetText(editorHint())
 				e.canvas.QueueDraw()
 				return true
 			}
@@ -132,7 +158,9 @@ func (e *editor) build() {
 	e.window.AddController(keysCtl)
 
 	header := gtk.NewHeaderBar()
+	header.SetShowTitleButtons(true)
 	e.window.SetTitlebar(header)
+	e.window.AddCSSClass("lamha-editor")
 
 	ensureToolbarCSS()
 
@@ -151,36 +179,40 @@ func (e *editor) build() {
 	save.ConnectClicked(e.save)
 	header.PackEnd(save)
 
-	root := gtk.NewBox(gtk.OrientationVertical, 14)
-	root.SetMarginTop(16)
-	root.SetMarginBottom(16)
-	root.SetMarginStart(16)
-	root.SetMarginEnd(16)
-
-	tools := gtk.NewBox(gtk.OrientationHorizontal, 0)
-	tools.SetCSSClasses([]string{"linked", "lamha-editor-chrome"})
-	e.tools = appendToolToggles(tools, editorTools(), e.tool, iconInkOnLight, e.setTool)
-	root.Append(tools)
-
-	options := gtk.NewBox(gtk.OrientationHorizontal, 12)
-	options.SetVAlign(gtk.AlignCenter)
-	e.colors = appendColorSwatches(options, 0, e.setColorIndex)
-
-	e.stroke = newStrokeControl(e.width, false, false, strokeWidthTip(), e.setWidth)
-	e.stroke.box.SetHExpand(true)
-	options.Append(e.stroke.box)
-
-	e.copyOnSave = gtk.NewCheckButtonWithLabel(i18n.T("Also copy to clipboard when saving"))
+	e.copyOnSave = newIconToggle("edit-copy-symbolic", i18n.T("Also copy to clipboard when saving"))
 	e.copyOnSave.SetActive(true)
-	e.copyOnSave.SetHAlign(gtk.AlignEnd)
-	options.Append(e.copyOnSave)
-	root.Append(options)
+	header.PackEnd(e.copyOnSave)
 
-	e.status = gtk.NewLabel(i18n.T("Click a mark to move or restyle it. Double-click text to edit. Scroll resizes the lens. Shortcuts are editable in the main window."))
-	alignStart(e.status)
-	e.status.SetWrap(true)
-	e.status.SetCSSClasses([]string{"dim-label"})
-	root.Append(e.status)
+	root := gtk.NewBox(gtk.OrientationVertical, 0)
+
+	chrome := gtk.NewBox(gtk.OrientationHorizontal, 8)
+	chrome.AddCSSClass("lamha-editor-bar")
+	chrome.AddCSSClass("toolbar")
+	chrome.SetHAlign(gtk.AlignFill)
+	chrome.SetVAlign(gtk.AlignStart)
+	chrome.SetVExpand(false)
+	if i18n.RTL() {
+		chrome.SetDirection(gtk.TextDirRTL)
+	}
+
+	tools := gtk.NewBox(gtk.OrientationHorizontal, 2)
+	tools.SetVAlign(gtk.AlignCenter)
+	tools.SetHAlign(gtk.AlignStart)
+	tools.SetHExpand(true)
+	tools.AddCSSClass("lamha-editor-chrome")
+	e.tools = appendToolToggles(tools, editorTools(), e.tool, iconInkThemed, e.setTool)
+	chrome.Append(tools)
+
+	sep := gtk.NewSeparator(gtk.OrientationVertical)
+	sep.SetVExpand(false)
+	sep.SetVAlign(gtk.AlignFill)
+	chrome.Append(sep)
+
+	e.colors = appendColorSwatches(chrome, 0, e.setColorIndex)
+
+	e.stroke = newStrokeControl(e.width, true, themePrefersDark(), strokeWidthTip(), e.setWidth)
+	chrome.Append(e.stroke.box)
+	root.Append(chrome)
 
 	e.canvas = gtk.NewDrawingArea()
 	e.canvas.SetHExpand(true)
@@ -188,6 +220,7 @@ func (e *editor) build() {
 	e.canvas.SetFocusable(true)
 	e.canvas.SetCursorFromName(cursorForTool(e.tool))
 	e.canvas.SetDrawFunc(e.draw)
+	e.stepPop = newStepNumberPop(e.nudgeStep)
 	e.bindGestures()
 	bindCursorTracking(e.canvas, func(x, y float64) {
 		e.cursorX, e.cursorY = x, y
@@ -195,12 +228,6 @@ func (e *editor) build() {
 		e.updateLens()
 	}, func() {
 		e.cursorIn = false
-		e.updateLens()
-	}, func(dy float64) {
-		e.magnifierSize = clampMagnifier(e.magnifierSize - dy*18)
-		if e.lens != nil {
-			e.lens.setSize(e.magnifierSize)
-		}
 		e.updateLens()
 	})
 
@@ -211,12 +238,40 @@ func (e *editor) build() {
 	e.lens.setSize(e.magnifierSize)
 	e.lens.attach(e.host)
 
-	e.host.SetCSSClasses([]string{"lamha-canvas-host"})
+	e.status = gtk.NewLabel(editorHint())
+	e.status.SetWrap(true)
+	e.status.SetJustify(gtk.JustifyCenter)
+	styleDim(e.status)
+	statusBox := gtk.NewBox(gtk.OrientationHorizontal, 0)
+	statusBox.AddCSSClass("osd")
+	statusBox.AddCSSClass("lamha-editor-status")
+	statusBox.SetHAlign(gtk.AlignCenter)
+	statusBox.SetVAlign(gtk.AlignEnd)
+	statusBox.SetMarginBottom(10)
+	statusBox.Append(e.status)
+	e.host.AddOverlay(statusBox)
+
+	e.host.SetCSSClasses([]string{"lamha-canvas-host", "view"})
 	e.host.SetHExpand(true)
 	e.host.SetVExpand(true)
 	root.Append(e.host)
 
 	e.window.SetChild(root)
+}
+
+func (e *editor) refreshChromeTheme() {
+	if e == nil {
+		return
+	}
+	if e.stroke != nil {
+		e.stroke.SetDark(themePrefersDark())
+	}
+	if e.tools != nil {
+		e.tools.queueDraw()
+	}
+	if e.colors != nil {
+		e.colors.queueDraw()
+	}
 }
 
 func (e *editor) bindGestures() {
@@ -233,10 +288,18 @@ func (e *editor) bindGestures() {
 		}
 		point := e.view.ToImage(x, y)
 		if e.tool == annotate.ToolSelect || e.tool == annotate.ToolMove {
+			if e.justDragged {
+				e.justDragged = false
+				e.maybeShowStepPop(e.selected)
+				e.refreshActions()
+				e.canvas.QueueDraw()
+				return
+			}
 			e.selected = e.doc.Hit(point)
 			if stroke, ok := e.doc.Stroke(e.selected); ok {
 				e.adoptStroke(stroke)
 			}
+			e.maybeShowStepPop(e.selected)
 			e.refreshActions()
 			e.canvas.QueueDraw()
 			return
@@ -247,7 +310,7 @@ func (e *editor) bindGestures() {
 				e.commitTyping()
 				e.refreshSurface()
 				e.canvas.QueueDraw()
-				e.status.SetText(i18n.T("Click a mark to move or restyle it. Double-click text to edit. Scroll resizes the lens. Shortcuts are editable in the main window."))
+				e.status.SetText(editorHint())
 			})
 			e.status.SetText(i18n.T("Type, then Enter to place. Escape cancels."))
 			e.updateLens()
@@ -279,6 +342,7 @@ func (e *editor) bindGestures() {
 			return
 		}
 		start := e.view.ToImage(startX, startY)
+		e.hideStepPop()
 		if e.tool == annotate.ToolSelect || e.tool == annotate.ToolMove {
 			if hit := e.doc.Hit(start); hit >= 0 {
 				e.selected = hit
@@ -346,7 +410,9 @@ func (e *editor) bindGestures() {
 	drag.ConnectDragEnd(func(offsetX, offsetY float64) {
 		if e.moving {
 			e.moving = false
+			e.justDragged = true
 			e.refreshSurface()
+			e.maybeShowStepPop(e.selected)
 			e.canvas.SetCursorFromName(cursorForTool(e.tool))
 			e.canvas.QueueDraw()
 			e.status.SetText(i18n.Tf("Moved the selected mark. Arrow keys nudge. %s.", withKey(i18n.T("Duplicate"), keys.Duplicate)))
@@ -566,7 +632,7 @@ func (e *editor) beginTextEdit(point annotate.Point) bool {
 		e.selected = applyTextCommit(e.doc, &e.text)
 		e.refreshSurface()
 		e.canvas.QueueDraw()
-		e.status.SetText(i18n.T("Click a mark to move or restyle it. Double-click text to edit. Scroll resizes the lens. Shortcuts are editable in the main window."))
+		e.status.SetText(editorHint())
 	})
 	e.refreshSurface()
 	e.canvas.QueueDraw()
@@ -589,6 +655,9 @@ func (e *editor) setTool(tool annotate.Tool) {
 	}
 	e.tool = tool
 	e.draft = nil
+	if tool != annotate.ToolSelect && tool != annotate.ToolMove {
+		e.hideStepPop()
+	}
 	if e.tools != nil {
 		e.tools.activate(tool)
 	}
@@ -654,12 +723,13 @@ func (e *editor) keyActions() keyActions {
 			if e.text.active() {
 				e.text.cancel()
 				e.refreshSurface()
-				e.status.SetText(i18n.T("Click a mark to move or restyle it. Double-click text to edit. Scroll resizes the lens. Shortcuts are editable in the main window."))
+				e.status.SetText(editorHint())
 				e.canvas.QueueDraw()
 				return true
 			}
 			if e.selected >= 0 {
 				e.selected = -1
+				e.hideStepPop()
 				e.canvas.QueueDraw()
 				return true
 			}
@@ -676,6 +746,7 @@ func (e *editor) nudgeSelected(dx, dy float64) bool {
 		return false
 	}
 	e.refreshSurface()
+	e.maybeShowStepPop(e.selected)
 	e.canvas.QueueDraw()
 	return true
 }
@@ -686,6 +757,7 @@ func (e *editor) duplicateSelected() {
 		return
 	}
 	e.selected = next
+	e.hideStepPop()
 	e.refreshSurface()
 	e.canvas.QueueDraw()
 	e.status.SetText(i18n.T("Duplicated the selected mark."))
@@ -704,6 +776,7 @@ func (e *editor) deleteSelected() {
 		return
 	}
 	e.selected = -1
+	e.hideStepPop()
 	e.refreshSurface()
 	e.canvas.QueueDraw()
 	e.status.SetText(i18n.T("Removed the selected mark."))
@@ -719,6 +792,7 @@ func (e *editor) undo() {
 		return
 	}
 	e.selected = -1
+	e.hideStepPop()
 	e.refreshSurface()
 	e.canvas.QueueDraw()
 	e.status.SetText(i18n.T("Undid the last mark."))
@@ -729,9 +803,42 @@ func (e *editor) redo() {
 		return
 	}
 	e.selected = -1
+	e.hideStepPop()
 	e.refreshSurface()
 	e.canvas.QueueDraw()
 	e.status.SetText(i18n.T("Redid the last mark."))
+}
+
+func (e *editor) nudgeStep(index, delta int) {
+	next := e.doc.AdjustStep(index, delta, prefs.Current().RenumberSteps(), prefs.Current().DeleteZeroSteps())
+	e.selected = next
+	e.refreshSurface()
+	e.refreshActions()
+	if next < 0 {
+		e.hideStepPop()
+		e.canvas.QueueDraw()
+		return
+	}
+	e.maybeShowStepPop(next)
+	e.canvas.QueueDraw()
+}
+
+func (e *editor) maybeShowStepPop(index int) {
+	stroke, ok := e.doc.Stroke(index)
+	if !ok || stroke.Tool != annotate.ToolStep {
+		e.hideStepPop()
+		return
+	}
+	if e.stepPop == nil {
+		e.stepPop = newStepNumberPop(e.nudgeStep)
+	}
+	e.stepPop.present(e.canvas, e.view, stroke, index)
+}
+
+func (e *editor) hideStepPop() {
+	if e.stepPop != nil {
+		e.stepPop.hide()
+	}
 }
 
 func (e *editor) save() {

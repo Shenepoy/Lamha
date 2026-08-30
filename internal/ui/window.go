@@ -4,7 +4,6 @@ package ui
 import (
 	"context"
 	"errors"
-	"log"
 	"time"
 
 	"github.com/diamondburned/gotk4/pkg/core/glib"
@@ -56,11 +55,12 @@ type Window struct {
 	historyMenu         *gtk.PopoverMenu
 	exportedHandle      string
 	exportedTop         *gdkwayland.WaylandToplevel
+	captureTrace        *captureTrace
 }
 
 // New builds Lamha's main window and its local capture store.
 func New(application *gtk.Application) (*Window, error) {
-	store, err := capture.NewStore("")
+	store, err := capture.NewStore(prefs.Current().SaveDirectory())
 	if err != nil {
 		return nil, err
 	}
@@ -85,6 +85,25 @@ func (w *Window) Present() {
 // Hide sends Lamha to the background indicator.
 func (w *Window) Hide() {
 	w.window.SetVisible(false)
+}
+
+func (w *Window) parkTransientWindows() {
+	if w.editor != nil {
+		w.editor.park()
+	}
+	for _, win := range []*gtk.Window{w.settingsWin, w.shortcuts, w.aboutWin} {
+		if win == nil {
+			continue
+		}
+		win.SetModal(false)
+		win.SetVisible(false)
+	}
+}
+
+func (w *Window) restoreParkedWindows() {
+	if w.editor != nil {
+		w.editor.unpark()
+	}
 }
 
 // IsShown reports whether the main window is on screen.
@@ -121,6 +140,10 @@ func (w *Window) build() {
 	w.window.SetIconName(brand.Name)
 	w.window.SetHideOnClose(true)
 	w.window.ConnectCloseRequest(func() bool {
+		if w.overlay != nil {
+			w.overlay.close(true)
+			return true
+		}
 		w.Hide()
 		return true
 	})
@@ -154,7 +177,7 @@ func (w *Window) build() {
 	w.status = gtk.NewLabel(i18n.T("Ready to capture."))
 	alignStart(w.status)
 	w.status.SetEllipsize(pango.EllipsizeEnd)
-	w.status.SetCSSClasses([]string{"dim-label"})
+	w.status.SetCSSClasses([]string{"dim-label", "dimmed"})
 	statusRow.Append(w.status)
 	header.PackStart(statusRow)
 
@@ -169,7 +192,7 @@ func (w *Window) build() {
 	delayBox := gtk.NewBox(gtk.OrientationHorizontal, 6)
 	delayBox.SetVAlign(gtk.AlignCenter)
 	w.delayLabel = gtk.NewLabel(i18n.T("Delay"))
-	w.delayLabel.SetCSSClasses([]string{"dim-label"})
+	w.delayLabel.SetCSSClasses([]string{"dim-label", "dimmed"})
 	delayBox.Append(w.delayLabel)
 	w.delay = gtk.NewDropDownFromStrings(delayLabels())
 	w.delay.SetSelected(0)
@@ -240,7 +263,7 @@ func (w *Window) buildHistoryPane() gtk.Widgetter {
 
 	w.recentTitle = gtk.NewLabel(i18n.T("Recent"))
 	alignStart(w.recentTitle)
-	w.recentTitle.SetCSSClasses([]string{"title-4"})
+	w.recentTitle.SetCSSClasses([]string{"title-4", "heading"})
 	column.Append(w.recentTitle)
 
 	scroll := gtk.NewScrolledWindow()
@@ -256,7 +279,7 @@ func (w *Window) buildHistoryPane() gtk.Widgetter {
 	w.history.SetShowSeparators(false)
 	w.history.SetCSSClasses([]string{"navigation-sidebar"})
 	w.historyPlaceholder = gtk.NewLabel(i18n.T("No captures yet"))
-	w.historyPlaceholder.SetCSSClasses([]string{"dim-label"})
+	w.historyPlaceholder.SetCSSClasses([]string{"dim-label", "dimmed"})
 	w.historyPlaceholder.SetWrap(true)
 	w.historyPlaceholder.SetJustify(gtk.JustifyCenter)
 	w.history.SetPlaceholder(&w.historyPlaceholder.Widget)
@@ -281,7 +304,7 @@ func (w *Window) buildPreviewPane() gtk.Widgetter {
 	w.preview.SetSizeRequest(480, 320)
 
 	w.emptyPreview = gtk.NewLabel(i18n.T("Select a capture to preview it."))
-	w.emptyPreview.SetCSSClasses([]string{"dim-label"})
+	w.emptyPreview.SetCSSClasses([]string{"dim-label", "dimmed"})
 	w.emptyPreview.SetWrap(true)
 	w.emptyPreview.SetHAlign(gtk.AlignCenter)
 	w.emptyPreview.SetVAlign(gtk.AlignCenter)
@@ -290,6 +313,7 @@ func (w *Window) buildPreviewPane() gtk.Widgetter {
 	w.previewStack = gtk.NewStack()
 	w.previewStack.SetHExpand(true)
 	w.previewStack.SetVExpand(true)
+	w.previewStack.AddCSSClass("view")
 	w.previewStack.AddNamed(w.emptyPreview, "empty")
 	w.previewStack.AddNamed(w.preview, "image")
 	w.previewStack.SetVisibleChildName("empty")
@@ -323,11 +347,14 @@ func (w *Window) startCapture(mode CaptureMode) {
 		return
 	}
 
+	w.parkTransientWindows()
 	delay := delayFromIndex(w.delay.Selected())
 	w.restoreAfterCapture = w.window.IsVisible()
+	w.captureTrace = newCaptureTrace()
 	w.setBusy(true, i18n.T("Capturing screen…"))
 	mon := monitorRect(w.window)
-	log.Printf("starting capture mode=%d", mode)
+	w.captureTrace.log("start", "mode=%d visible=%v mapped=%v delay=%s monitor=%v",
+		mode, w.window.IsVisible(), w.window.Mapped(), delay, !mon.Empty())
 
 	if mode == CaptureWindow {
 		go func() {
@@ -358,14 +385,20 @@ func (w *Window) startCapture(mode CaptureMode) {
 			timer.Stop()
 		}
 
+		w.captureTrace.log("grab", "begin")
 		staging, err := w.grabSilent(ctx)
 		glib.IdleAdd(func() {
 			w.setBusy(false, "")
 			if err != nil {
+				if w.captureTrace != nil {
+					w.captureTrace.log("grab", "failed: %v", err)
+				}
 				w.failCapture(err)
 				return
 			}
-			log.Printf("opening capture overlay")
+			if w.captureTrace != nil {
+				w.captureTrace.log("grab", "ok staging=%s", staging)
+			}
 			w.openCaptureOverlay(mode, staging, nil)
 		})
 	}()
@@ -407,8 +440,10 @@ func (w *Window) failCapture(err error) {
 	w.status.SetText(message)
 	if w.restoreAfterCapture {
 		w.Present()
+		w.restoreParkedWindows()
 		return
 	}
+	w.restoreParkedWindows()
 	w.Notify("Lamha", message)
 }
 

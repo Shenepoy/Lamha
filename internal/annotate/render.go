@@ -22,7 +22,7 @@ func apply(dst *image.NRGBA, stroke Stroke) {
 		if len(stroke.Points) > 0 {
 			x, y = stroke.Points[0].X, stroke.Points[0].Y
 		}
-		drawStep(dst, x, y, stroke.Step, stroke.Color.nrgbaColor(), stepDiameter(width))
+		drawStep(dst, x, y, stroke.Step, stroke.Color.nrgbaColor(), StepDiameter(width))
 	case ToolMagicErase:
 		magicErase(dst, stroke.Points, width)
 	case ToolAreaErase:
@@ -136,13 +136,6 @@ func fillRect(dst *image.NRGBA, r image.Rectangle, c color.NRGBA) {
 
 func fillRectBlend(dst *image.NRGBA, r image.Rectangle, c color.NRGBA) {
 	fillRect(dst, r.Intersect(dst.Bounds()), c)
-}
-
-func drawStep(dst *image.NRGBA, cx, cy float64, number int, c color.NRGBA, diameter float64) {
-	radius := diameter / 2
-	stampDisc(dst, cx, cy, radius, c)
-	stampDisc(dst, cx, cy, radius*0.72, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
-	drawNumber(dst, cx, cy, number, c, diameter)
 }
 
 func inBounds(img *image.NRGBA, x, y int) bool {

@@ -48,6 +48,7 @@ func (t *textInput) start(host *gtk.Overlay, view annotate.View, pos annotate.Po
 	t.entry.SetPlaceholderText(i18n.T("Type here…"))
 	t.entry.SetWidthChars(16)
 	t.entry.AddCSSClass("lamha-text-entry")
+	t.entry.AddCSSClass("osd")
 	t.entry.SetHAlign(gtk.AlignStart)
 	t.entry.SetVAlign(gtk.AlignStart)
 	if i18n.RTL() {

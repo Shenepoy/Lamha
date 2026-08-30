@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
+	"github.com/diamondburned/gotk4/pkg/core/glib"
 	"github.com/diamondburned/gotk4/pkg/gdk/v4"
 	"github.com/diamondburned/gotk4/pkg/gio/v2"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
@@ -14,6 +16,24 @@ import (
 	"github.com/lamha-app/lamha/internal/capture"
 	"github.com/lamha-app/lamha/internal/i18n"
 )
+
+var contextMenuCSSOnce sync.Once
+
+func ensureContextMenuCSS() {
+	contextMenuCSSOnce.Do(func() {
+		provider := gtk.NewCSSProvider()
+		provider.LoadFromData(`
+popover.lamha-context-menu contents,
+popover.lamha-context-menu scrolledwindow,
+popover.lamha-context-menu scrolledwindow > viewport {
+  max-height: none;
+}
+`)
+		if display := gdk.DisplayGetDefault(); display != nil {
+			gtk.StyleContextAddProviderForDisplay(display, provider, gtk.STYLE_PROVIDER_PRIORITY_USER)
+		}
+	})
+}
 
 func (w *Window) newHistoryRow(item capture.SavedCapture) *gtk.ListBoxRow {
 	row := gtk.NewListBoxRow()
@@ -45,7 +65,7 @@ func (w *Window) newHistoryRow(item capture.SavedCapture) *gtk.ListBoxRow {
 
 	meta := gtk.NewLabel(formatCaptureMeta(item))
 	alignStart(meta)
-	meta.SetCSSClasses([]string{"dim-label", "caption"})
+	meta.SetCSSClasses([]string{"dim-label", "dimmed", "caption"})
 	meta.SetEllipsize(pango.EllipsizeEnd)
 	text.Append(meta)
 
@@ -63,7 +83,7 @@ func (w *Window) attachHistoryMenu(row *gtk.ListBoxRow, item capture.SavedCaptur
 		click.SetState(gtk.EventSequenceClaimed)
 	})
 	click.ConnectReleased(func(nPress int, x, y float64) {
-		w.popupCaptureMenu(&row.Widget, item)
+		w.popupCaptureMenu(&row.Widget, item, x, y)
 	})
 	row.AddController(click)
 }
@@ -82,12 +102,12 @@ func (w *Window) attachPreviewMenu() {
 		if w.lastCapture == nil {
 			return
 		}
-		w.popupCaptureMenu(&w.previewStack.Widget, *w.lastCapture)
+		w.popupCaptureMenu(&w.previewStack.Widget, *w.lastCapture, x, y)
 	})
 	w.previewStack.AddController(click)
 }
 
-func (w *Window) popupCaptureMenu(parent gtk.Widgetter, item capture.SavedCapture) {
+func (w *Window) popupCaptureMenu(parent gtk.Widgetter, item capture.SavedCapture, x, y float64) {
 	if w.historyMenu != nil {
 		w.historyMenu.Popdown()
 		w.historyMenu.Unparent()
@@ -118,9 +138,30 @@ func (w *Window) popupCaptureMenu(parent gtk.Widgetter, item capture.SavedCaptur
 	model.AppendSection("", open)
 	model.AppendSection("", danger)
 
+	host := w.menuHost()
+	hx, hy := x, y
+	if src := gtk.BaseWidget(parent); src != nil && host != nil {
+		if px, py, ok := widgetPoint(src, host, x, y); ok {
+			hx, hy = px, py
+		}
+	}
+	if host == nil {
+		host = parent
+	}
+
+	ensureContextMenuCSS()
 	pop := gtk.NewPopoverMenuFromModel(model)
-	pop.SetParent(parent)
+	pop.SetParent(host)
+	pop.AddCSSClass("lamha-context-menu")
 	pop.SetHasArrow(false)
+	pop.SetHAlign(gtk.AlignStart)
+	if hostH := widgetHeight(host); hostH > 0 && hy > float64(hostH)/2 {
+		pop.SetPosition(gtk.PosTop)
+	} else {
+		pop.SetPosition(gtk.PosBottom)
+	}
+	rect := gdk.NewRectangle(int(hx), int(hy), 1, 1)
+	pop.SetPointingTo(&rect)
 	pop.InsertActionGroup("win", &w.window.ActionGroup)
 	w.historyMenu = pop
 	pop.ConnectClosed(func() {
@@ -128,7 +169,95 @@ func (w *Window) popupCaptureMenu(parent gtk.Widgetter, item capture.SavedCaptur
 			w.historyMenu = nil
 		}
 	})
+	maxH := menuMaxHeight(host)
+	unclipPopoverMenu(pop, maxH)
 	pop.Popup()
+	pop.Present()
+	glib.IdleAdd(func() bool {
+		if w.historyMenu != pop {
+			return false
+		}
+		unclipPopoverMenu(pop, maxH)
+		pop.Present()
+		return false
+	})
+}
+
+func (w *Window) menuHost() gtk.Widgetter {
+	if w.window == nil {
+		return nil
+	}
+	if child := w.window.Child(); child != nil {
+		return child
+	}
+	return &w.window.Widget
+}
+
+func widgetHeight(widget gtk.Widgetter) int {
+	if widget == nil {
+		return 0
+	}
+	return gtk.BaseWidget(widget).AllocatedHeight()
+}
+
+func menuMaxHeight(host gtk.Widgetter) int {
+	h := widgetHeight(host)
+	if h < 240 {
+		h = 240
+	}
+	if h > 48 {
+		return h - 24
+	}
+	return h
+}
+
+func unclipPopoverMenu(pop *gtk.PopoverMenu, maxH int) {
+	if pop == nil {
+		return
+	}
+	if maxH < 240 {
+		maxH = 240
+	}
+	visitWidgets(&pop.Widget, func(widget gtk.Widgetter) {
+		sw := asScrolledWindow(widget)
+		if sw == nil {
+			return
+		}
+		sw.SetPropagateNaturalWidth(true)
+		sw.SetPropagateNaturalHeight(true)
+		sw.SetMaxContentHeight(maxH)
+		sw.SetPolicy(gtk.PolicyNever, gtk.PolicyAutomatic)
+	})
+}
+
+func visitWidgets(widget gtk.Widgetter, fn func(gtk.Widgetter)) {
+	if widget == nil {
+		return
+	}
+	fn(widget)
+	base := gtk.BaseWidget(widget)
+	for child := base.FirstChild(); child != nil; child = gtk.BaseWidget(child).NextSibling() {
+		visitWidgets(child, fn)
+	}
+}
+
+func asScrolledWindow(widget gtk.Widgetter) *gtk.ScrolledWindow {
+	if widget == nil {
+		return nil
+	}
+	if sw, ok := widget.(*gtk.ScrolledWindow); ok {
+		return sw
+	}
+	object := glib.BaseObject(widget)
+	if object == nil {
+		return nil
+	}
+	casted := object.WalkCast(func(obj glib.Objector) bool {
+		_, ok := obj.(*gtk.ScrolledWindow)
+		return ok
+	})
+	sw, _ := casted.(*gtk.ScrolledWindow)
+	return sw
 }
 
 func (w *Window) contextCapture() (capture.SavedCapture, bool) {

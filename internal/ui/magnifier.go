@@ -17,18 +17,11 @@ const (
 	maxMagnifier     = 320.0
 )
 
-func bindCursorTracking(canvas *gtk.DrawingArea, onMove func(x, y float64), onLeave func(), onScroll func(dy float64)) {
+func bindCursorTracking(canvas *gtk.DrawingArea, onMove func(x, y float64), onLeave func()) {
 	motion := gtk.NewEventControllerMotion()
 	motion.ConnectMotion(func(x, y float64) { onMove(x, y) })
 	motion.ConnectLeave(func() { onLeave() })
 	canvas.AddController(motion)
-
-	scroll := gtk.NewEventControllerScroll(gtk.EventControllerScrollVertical)
-	scroll.ConnectScroll(func(dx, dy float64) bool {
-		onScroll(dy)
-		return true
-	})
-	canvas.AddController(scroll)
 }
 
 func clampMagnifier(size float64) float64 {
@@ -52,6 +45,7 @@ func newMagnifierLens() *magnifierLens {
 	lens.area.AddCSSClass("lamha-lens")
 	lens.area.SetCanTarget(false)
 	lens.area.SetCanFocus(false)
+	lens.area.SetVisible(false)
 	lens.resize()
 	lens.area.SetDrawFunc(lens.draw)
 
@@ -94,6 +88,7 @@ func (m *magnifierLens) hide() {
 		return
 	}
 	m.src = nil
+	m.area.SetVisible(false)
 	m.layer.SetVisible(false)
 }
 
@@ -132,11 +127,15 @@ func (m *magnifierLens) follow(view annotate.View, src *image.NRGBA, widgetX, wi
 	} else {
 		m.layer.Move(m.area, x, y)
 	}
+	m.area.SetVisible(true)
 	m.layer.SetVisible(true)
 	m.area.QueueDraw()
 }
 
 func (m *magnifierLens) draw(_ *gtk.DrawingArea, cr *cairo.Context, width, height int) {
+	cr.SetOperator(cairo.OperatorClear)
+	cr.Paint()
+	cr.SetOperator(cairo.OperatorOver)
 	if m.src == nil || width < 8 || height < 8 {
 		return
 	}

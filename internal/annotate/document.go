@@ -237,6 +237,55 @@ func (d *Document) Move(i int, dx, dy float64) bool {
 	return true
 }
 
+// AdjustStep changes the step number at i by delta.
+// If renumber is true, every other step shifts by the same delta.
+// If deleteZero is true, any step that lands at 0 or below is removed.
+// Returns the (possibly updated) index, or -1 if the stroke was removed.
+func (d *Document) AdjustStep(i, delta int, renumber, deleteZero bool) int {
+	if i < 0 || i >= len(d.strokes) || d.strokes[i].Tool != ToolStep || delta == 0 {
+		return i
+	}
+	next := d.strokes[i].Step + delta
+	if next < 0 {
+		next = 0
+	}
+	if renumber {
+		for j := range d.strokes {
+			if j == i || d.strokes[j].Tool != ToolStep {
+				continue
+			}
+			shifted := d.strokes[j].Step + delta
+			if shifted < 0 {
+				shifted = 0
+			}
+			d.strokes[j].Step = shifted
+		}
+	}
+	d.strokes[i].Step = next
+	if deleteZero {
+		i = d.removeZeroSteps(i)
+	}
+	d.recomputeNext()
+	d.invalidate()
+	return i
+}
+
+func (d *Document) removeZeroSteps(keep int) int {
+	out := make([]Stroke, 0, len(d.strokes))
+	newKeep := -1
+	for j, stroke := range d.strokes {
+		if stroke.Tool == ToolStep && stroke.Step <= 0 {
+			continue
+		}
+		if j == keep {
+			newKeep = len(out)
+		}
+		out = append(out, stroke)
+	}
+	d.strokes = out
+	return newKeep
+}
+
 // Replace overwrites the stroke at i without clearing redo.
 func (d *Document) Replace(i int, stroke Stroke) bool {
 	if i < 0 || i >= len(d.strokes) {

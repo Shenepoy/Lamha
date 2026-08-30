@@ -23,9 +23,13 @@ func (w *Window) openShortcutSettings() {
 	win.SetTitle(i18n.T("Keyboard shortcuts"))
 	win.SetIconName(brand.Name)
 	applyDirection(&win.Widget)
-	win.SetTransientFor(&w.window.Window)
+	if w.settingsWin != nil {
+		win.SetTransientFor(w.settingsWin)
+	} else {
+		win.SetTransientFor(&w.window.Window)
+	}
 	win.SetModal(true)
-	win.SetDefaultSize(520, 640)
+	win.SetDefaultSize(540, 700)
 	win.SetHideOnClose(true)
 	win.ConnectCloseRequest(func() bool {
 		w.shortcuts = nil
@@ -35,21 +39,12 @@ func (w *Window) openShortcutSettings() {
 
 	header := gtk.NewHeaderBar()
 	resetAll := gtk.NewButtonWithLabel(i18n.T("Reset all"))
+	resetAll.AddCSSClass("flat")
 	header.PackStart(resetAll)
 	win.SetTitlebar(header)
 
-	status := gtk.NewLabel(i18n.T("Click a shortcut, then press the new keys. Backspace clears it."))
-	status.SetWrap(true)
-	alignStart(status)
-	status.SetCSSClasses([]string{"dim-label"})
-	status.SetMarginStart(18)
-	status.SetMarginEnd(18)
-	status.SetMarginTop(12)
-
-	list := gtk.NewBox(gtk.OrientationVertical, 4)
-	list.SetMarginStart(18)
-	list.SetMarginEnd(18)
-	list.SetMarginBottom(18)
+	ensurePrefsCSS()
+	status := prefsBanner(i18n.T("Click a shortcut, then press the new keys. Backspace clears it."))
 
 	type row struct {
 		binding keys.Binding
@@ -66,6 +61,9 @@ func (w *Window) openShortcutSettings() {
 			}
 			if recording == item.binding.ID {
 				label = i18n.T("Press a key…")
+				item.button.AddCSSClass("suggested-action")
+			} else {
+				item.button.RemoveCSSClass("suggested-action")
 			}
 			item.button.SetLabel(label)
 		}
@@ -94,27 +92,22 @@ func (w *Window) openShortcutSettings() {
 		refresh()
 	}
 
-	for _, group := range keys.Groups() {
-		title := gtk.NewLabel(i18n.T(group.Title))
-		alignStart(title)
-		title.SetCSSClasses([]string{"title-4"})
-		title.SetMarginTop(14)
-		title.SetMarginBottom(4)
-		list.Append(title)
+	page := prefsPage()
+	page.Append(status)
 
+	for _, group := range keys.Groups() {
+		wrap, card := prefsGroup(i18n.T(group.Title), "")
+		visible := 0
 		for _, binding := range group.Bindings {
 			if binding.ID == keys.CaptureWindow {
 				continue
 			}
 			binding := binding
-			line := gtk.NewBox(gtk.OrientationHorizontal, 12)
-			name := gtk.NewLabel(i18n.T(binding.Label))
-			alignStart(name)
-			name.SetHExpand(true)
-			line.Append(name)
-
 			button := gtk.NewButton()
-			button.SetSizeRequest(168, -1)
+			button.AddCSSClass("lamha-key")
+			button.AddCSSClass("monospace")
+			button.SetVAlign(gtk.AlignCenter)
+			button.SetHAlign(gtk.AlignEnd)
 			button.ConnectClicked(func() {
 				if recording == binding.ID {
 					recording = ""
@@ -126,19 +119,29 @@ func (w *Window) openShortcutSettings() {
 				status.SetText(i18n.Tf("Press a shortcut for %s. Escape cancels.", i18n.T(binding.Label)))
 				refresh()
 			})
-			line.Append(button)
 
 			reset := gtk.NewButtonWithLabel(i18n.T("Reset"))
+			reset.AddCSSClass("flat")
+			reset.SetVAlign(gtk.AlignCenter)
 			reset.ConnectClicked(func() {
 				recording = ""
 				item, _ := keys.Lookup(binding.ID)
 				setAccel(binding.ID, item.Default)
 			})
-			line.Append(reset)
 
-			list.Append(line)
+			actions := gtk.NewBox(gtk.OrientationHorizontal, 6)
+			actions.SetVAlign(gtk.AlignCenter)
+			actions.Append(button)
+			actions.Append(reset)
+
+			card.Append(prefsRow(i18n.T(binding.Label), "", actions))
 			rows = append(rows, row{binding: binding, button: button})
+			visible++
 		}
+		if visible == 0 {
+			continue
+		}
+		page.Append(wrap)
 	}
 
 	resetAll.ConnectClicked(func() {
@@ -185,13 +188,9 @@ func (w *Window) openShortcutSettings() {
 
 	scroll := gtk.NewScrolledWindow()
 	scroll.SetPolicy(gtk.PolicyNever, gtk.PolicyAutomatic)
-	scroll.SetChild(list)
+	scroll.SetChild(page)
 	scroll.SetVExpand(true)
-
-	root := gtk.NewBox(gtk.OrientationVertical, 0)
-	root.Append(status)
-	root.Append(scroll)
-	win.SetChild(root)
+	win.SetChild(scroll)
 
 	w.shortcuts = win
 	win.Present()

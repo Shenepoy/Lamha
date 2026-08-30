@@ -19,32 +19,49 @@ func ensureToolbarCSS() {
 		provider := gtk.NewCSSProvider()
 		provider.LoadFromData(`
 .lamha-toolbar {
-  background-color: alpha(black, 0.78);
-  border-radius: 14px;
-  padding: 12px 16px;
-  margin-top: 16px;
-  min-height: 56px;
-  color: white;
+  padding: 10px 14px;
+  border-radius: 15px;
+}
+.lamha-toolbar-vertical {
+  padding: 8px 6px;
+}
+.lamha-toolbar-vertical button {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 1px;
+}
+.lamha-toolbar scrolledwindow {
+  background: none;
+  min-width: 0;
+  min-height: 0;
+}
+.lamha-grab {
+  min-width: 18px;
+  min-height: 18px;
+  opacity: 0.75;
+  border-radius: 8px;
+}
+.lamha-grab:hover {
+  background-color: alpha(currentColor, 0.12);
+  opacity: 1;
+}
+.lamha-toolbar-locked .lamha-grab {
+  opacity: 0.28;
+}
+.lamha-capture-status,
+.lamha-editor-status {
+  padding: 6px 12px;
+  border-radius: 10px;
 }
 .lamha-toolbar button {
-  color: white;
   min-width: 36px;
   min-height: 36px;
   padding: 3px;
 }
-.lamha-toolbar button:hover {
-  background-color: alpha(white, 0.12);
-}
-.lamha-toolbar button:checked,
-.lamha-toolbar button:active {
-  background-color: alpha(white, 0.22);
-  color: white;
-}
 .lamha-toolbar button:disabled {
-  opacity: 0.35;
+  opacity: var(--disabled-opacity, 0.5);
 }
 .lamha-toolbar image {
-  color: white;
   -gtk-icon-style: symbolic;
   -gtk-icon-size: 28px;
 }
@@ -52,38 +69,49 @@ func ensureToolbarCSS() {
   min-width: 180px;
   padding: 6px 10px;
   border-radius: 8px;
-  background-color: alpha(black, 0.72);
-  color: white;
-  caret-color: white;
 }
 .lamha-toolbar separator {
-  background-color: alpha(white, 0.35);
   min-width: 1px;
+  min-height: 1px;
 }
-.lamha-toolbar scale trough {
-  background-color: alpha(white, 0.25);
-}
-.lamha-toolbar .dim-label {
-  color: alpha(white, 0.85);
+.lamha-toolbar-vertical separator {
+  min-width: 0;
 }
 .lamha-stroke-preview {
-  min-width: 64px;
-  min-height: 18px;
-  margin: 4px 4px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+.lamha-toolbar-vertical scale {
+  min-width: 0;
+  min-height: 40px;
+  max-width: 18px;
+  padding: 0;
+}
+.lamha-toolbar-horizontal scale {
+  min-height: 16px;
+  max-height: 18px;
 }
 .lamha-stroke-stepper {
-  margin: 4px 2px;
+  margin: 2px 0;
   padding: 2px;
   border-radius: 8px;
-  min-height: 32px;
+}
+.lamha-stroke-stepper-vertical {
+  min-width: 0;
 }
 .lamha-stroke-stepper-dark {
-  background-color: alpha(white, 0.12);
-  border: 1px solid alpha(white, 0.28);
+  background-color: alpha(currentColor, 0.12);
+  border: 1px solid alpha(currentColor, 0.28);
 }
 .lamha-stroke-stepper-light {
-  background-color: alpha(currentColor, 0.06);
-  border: 1px solid alpha(currentColor, 0.16);
+  background-color: alpha(@theme_fg_color, 0.08);
+  border: 1px solid @borders;
+  color: @theme_fg_color;
+}
+.lamha-stroke-stepper-light button,
+.lamha-stroke-stepper-light .lamha-stroke-value {
+  color: inherit;
 }
 .lamha-stroke-stepper button {
   min-width: 28px;
@@ -91,24 +119,23 @@ func ensureToolbarCSS() {
   padding: 0 4px;
   border-radius: 6px;
 }
-.lamha-stroke-stepper-dark button,
-.lamha-stroke-stepper-dark .lamha-stroke-value {
-  color: white;
-}
 .lamha-stroke-value {
   min-width: 2.2em;
   font-weight: 600;
   padding: 0 6px;
+}
+.lamha-step-pop contents,
+.lamha-step-pop {
+  padding: 4px;
+}
+.lamha-step-pop .lamha-stroke-stepper {
+  margin: 0;
 }
 .lamha-swatch {
   min-width: 32px;
   min-height: 32px;
   margin: 2px 1px;
   padding: 3px;
-  border-radius: 999px;
-}
-.lamha-swatch:hover {
-  background-color: alpha(currentColor, 0.08);
 }
 .lamha-editor-chrome button {
   min-width: 36px;
@@ -116,17 +143,52 @@ func ensureToolbarCSS() {
   padding: 4px;
   border-radius: 8px;
 }
-.lamha-editor-chrome button:hover {
-  background-color: alpha(currentColor, 0.08);
-}
 .lamha-editor-chrome button:checked,
 .lamha-editor-chrome button:active {
-  background-color: alpha(#3584e4, 0.18);
+  background-color: alpha(@theme_selected_bg_color, 0.24);
+}
+.lamha-editor-bar {
+  background-color: @theme_bg_color;
+  color: @theme_fg_color;
+  border-bottom: 1px solid @borders;
+  padding: 4px 10px;
+}
+.lamha-editor-bar separator {
+  min-height: 28px;
+  margin: 6px 4px;
+  background-color: @borders;
 }
 .lamha-canvas-host {
-  border-radius: 12px;
-  border: 1px solid alpha(currentColor, 0.14);
+  background-color: @theme_base_color;
+  color: @theme_text_color;
+  border-radius: 0;
+  border: none;
 }
+@media (prefers-contrast: more) {
+  .lamha-editor-bar,
+  .lamha-stroke-stepper-light,
+  .lamha-stroke-stepper-dark {
+    border-width: 2px;
+  }
+}
+window.lamha-capture,
+window.lamha-capture > box,
+.lamha-capture-host,
+.lamha-capture-canvas {
+  background-color: #0d0d0e;
+  background-image: none;
+  box-shadow: none;
+}
+window.lamha-ghost {
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+window.lamha-capture scrolledwindow,
+window.lamha-capture scrolledwindow > viewport,
+window.lamha-capture viewport,
+.lamha-toolbar scrolledwindow,
+.lamha-toolbar scrolledwindow > viewport,
 .lamha-lens,
 .lamha-lens-layer {
   background: none;
@@ -149,7 +211,7 @@ window.lamha-picker {
 }
 `)
 		if display := gdk.DisplayGetDefault(); display != nil {
-			gtk.StyleContextAddProviderForDisplay(display, provider, gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+			gtk.StyleContextAddProviderForDisplay(display, provider, gtk.STYLE_PROVIDER_PRIORITY_USER)
 		}
 	})
 }
@@ -183,6 +245,17 @@ type colorSwitcher struct {
 	updating bool
 	areas    []*gtk.DrawingArea
 	buttons  []*gtk.ToggleButton
+}
+
+func (s *colorSwitcher) queueDraw() {
+	if s == nil {
+		return
+	}
+	for _, area := range s.areas {
+		if area != nil {
+			area.QueueDraw()
+		}
+	}
 }
 
 func (s *colorSwitcher) activate(index int) {
@@ -223,7 +296,7 @@ func appendColorSwatches(box *gtk.Box, active int, onPick func(int)) *colorSwitc
 		button.SetHasFrame(false)
 		button.SetVAlign(gtk.AlignCenter)
 		unfocusable(&button.Widget)
-		button.SetCSSClasses([]string{"lamha-swatch"})
+		button.SetCSSClasses([]string{"lamha-swatch", "circular", "flat"})
 		if group == nil {
 			group = button
 		} else {
@@ -265,11 +338,23 @@ func drawColorSwatch(cr *cairo.Context, color annotate.Color, selected bool, wid
 
 	switch swatchBorderKind(color) {
 	case "dark":
-		cr.SetSourceRGB(0.22, 0.23, 0.26)
+		if themePrefersDark() {
+			cr.SetSourceRGB(0.12, 0.13, 0.15)
+		} else {
+			cr.SetSourceRGB(0.22, 0.23, 0.26)
+		}
 	case "light":
-		cr.SetSourceRGB(0.64, 0.66, 0.70)
+		if themePrefersDark() {
+			cr.SetSourceRGB(0.82, 0.84, 0.88)
+		} else {
+			cr.SetSourceRGB(0.64, 0.66, 0.70)
+		}
 	default:
-		cr.SetSourceRGBA(0, 0, 0, 0.38)
+		if themePrefersDark() {
+			cr.SetSourceRGBA(1, 1, 1, 0.42)
+		} else {
+			cr.SetSourceRGBA(0, 0, 0, 0.38)
+		}
 	}
 	cr.SetLineWidth(1.3)
 	cr.Arc(cx, cy, radius, 0, 6.283185307179586)
@@ -285,6 +370,21 @@ func drawColorSwatch(cr *cairo.Context, color annotate.Color, selected bool, wid
 
 type toolSwitcher struct {
 	buttons map[annotate.Tool]*gtk.ToggleButton
+}
+
+func (s *toolSwitcher) queueDraw() {
+	if s == nil {
+		return
+	}
+	for _, button := range s.buttons {
+		if button == nil {
+			continue
+		}
+		if child := button.Child(); child != nil {
+			gtk.BaseWidget(child).QueueDraw()
+		}
+		button.QueueDraw()
+	}
 }
 
 func (s *toolSwitcher) activate(tool annotate.Tool) {

@@ -16,6 +16,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/lamha-app/lamha/internal/prefs"
 )
 
 // SavedCapture identifies a screenshot copied into Lamha's local library.
@@ -33,35 +35,16 @@ type Store struct {
 	directory string
 }
 
-// NewStore creates a store in directory. If directory is empty, the user's
-// XDG data directory is used.
+// NewStore creates a store in directory. If directory is empty, screenshots
+// go to Pictures/Screenshots.
 func NewStore(directory string) (*Store, error) {
 	if directory == "" {
-		dataDir, err := userDataDir()
-		if err != nil {
-			return nil, err
-		}
-		directory = filepath.Join(dataDir, "lamha", "captures")
+		directory = prefs.DefaultSaveDirectory()
 	}
 	if err := os.MkdirAll(directory, 0o755); err != nil {
 		return nil, fmt.Errorf("create capture directory: %w", err)
 	}
 	return &Store{directory: directory}, nil
-}
-
-func userDataDir() (string, error) {
-	if dataDir := os.Getenv("XDG_DATA_HOME"); dataDir != "" {
-		if !filepath.IsAbs(dataDir) {
-			return "", errors.New("XDG_DATA_HOME must be an absolute path")
-		}
-		return dataDir, nil
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("find home directory for capture store: %w", err)
-	}
-	return filepath.Join(home, ".local", "share"), nil
 }
 
 // Directory returns the location where Lamha stores successful captures.

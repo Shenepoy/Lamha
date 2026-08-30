@@ -20,7 +20,11 @@ func (w *Window) openAbout() {
 	win.SetTitle(i18n.T("About Me"))
 	win.SetIconName(brand.Name)
 	applyDirection(&win.Widget)
-	win.SetTransientFor(&w.window.Window)
+	if w.settingsWin != nil {
+		win.SetTransientFor(w.settingsWin)
+	} else {
+		win.SetTransientFor(&w.window.Window)
+	}
 	win.SetModal(true)
 	win.SetDefaultSize(400, 360)
 	win.SetHideOnClose(true)
@@ -63,6 +67,7 @@ func aboutContent(centered bool) *gtk.Box {
 	summary := gtk.NewLabel(i18n.T("I am a researcher and developer skilled in Dart, Rust, and AI. I build diverse projects, from mobile apps to server tools, while exploring 3D printing, virtual cycling, and mastering multiple languages."))
 	summary.SetWrap(true)
 	summary.SetMaxWidthChars(42)
+	summary.AddCSSClass("body")
 
 	profile := gtk.NewLinkButtonWithLabel(brand.DeveloperProfileURL, i18n.T("View profile"))
 	source := gtk.NewLinkButtonWithLabel(brand.SourceURL, i18n.T("Source Code"))

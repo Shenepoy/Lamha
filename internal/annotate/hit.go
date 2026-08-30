@@ -39,7 +39,7 @@ func (s Stroke) Bounds() image.Rectangle {
 		if len(s.Points) > 0 {
 			x, y = s.Points[0].X, s.Points[0].Y
 		}
-		r := stepDiameter(s.Width) / 2
+		r := StepDiameter(s.Width) / 2
 		return RectFromPoints(x-r, y-r, x+r, y+r)
 	case ToolText:
 		return textBounds(s.X1, s.Y1, s.Text, s.Width)
@@ -67,7 +67,7 @@ func (s Stroke) Hit(p Point, slop float64) bool {
 		if len(s.Points) > 0 {
 			x, y = s.Points[0].X, s.Points[0].Y
 		}
-		return math.Hypot(p.X-x, p.Y-y) <= stepDiameter(s.Width)/2+slop
+		return math.Hypot(p.X-x, p.Y-y) <= StepDiameter(s.Width)/2+slop
 	case ToolArrow:
 		return hitArrow(s, p, slop)
 	case ToolEllipse:
@@ -93,6 +93,7 @@ func distToSegment(p, a, b Point) float64 {
 	return math.Hypot(p.X-(a.X+t*dx), p.Y-(a.Y+t*dy))
 }
 
-func stepDiameter(width float64) float64 {
+// StepDiameter is the on-image size of a numbered step badge.
+func StepDiameter(width float64) float64 {
 	return math.Max(48, width*5.5)
 }

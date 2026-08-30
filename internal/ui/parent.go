@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -12,7 +13,10 @@ import (
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 )
 
-const appID = "io.github.lamha.Lamha"
+const (
+	appID               = "io.github.lamha.Lamha"
+	parentExportTimeout = 2 * time.Second
+)
 
 // PortalParent exports a Wayland handle for desktop-portal dialogs.
 func (w *Window) PortalParent(ctx context.Context) (string, func()) {
@@ -25,18 +29,27 @@ func (w *Window) exportPortalParent(ctx context.Context) (string, func()) {
 		drop   func()
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, parentExportTimeout)
+	defer cancel()
+
 	done := make(chan result, 1)
 	glib.IdleAdd(func() {
 		w.dropExportedHandle()
 		err := requestWaylandExport(w.window, func(parent, handle string, toplevel *gdkwayland.WaylandToplevel) {
 			w.exportedHandle = handle
 			w.exportedTop = toplevel
-			done <- result{parent: parent, drop: func() {
+			select {
+			case done <- result{parent: parent, drop: func() {
 				glib.IdleAdd(func() { w.dropExportedHandle() })
-			}}
+			}}:
+			default:
+			}
 		})
 		if err != nil {
-			done <- result{drop: func() {}}
+			select {
+			case done <- result{drop: func() {}}:
+			default:
+			}
 		}
 	})
 
@@ -47,6 +60,7 @@ func (w *Window) exportPortalParent(ctx context.Context) (string, func()) {
 		}
 		return out.parent, out.drop
 	case <-ctx.Done():
+		log.Printf("portal parent export timed out")
 		return "", func() {}
 	}
 }
@@ -143,6 +157,8 @@ func (w *Window) waitPortalHost(ctx context.Context) (*gtk.Window, error) {
 			win.SetResizable(false)
 			win.SetDeletable(false)
 			win.SetDefaultSize(1, 1)
+			win.AddCSSClass("lamha-ghost")
+			win.ConnectRealize(func() { clearOpaqueRegion(win) })
 			w.portalHost = win
 		}
 		host := w.portalHost

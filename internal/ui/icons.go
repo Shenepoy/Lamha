@@ -11,20 +11,37 @@ import (
 )
 
 type iconInk struct {
-	r, g, b float64
+	r, g, b     float64
+	followTheme bool
 }
 
 var (
-	iconInkOnDark  = iconInk{1, 1, 1}
-	iconInkOnLight = iconInk{0.13, 0.14, 0.16}
+	iconInkOnDark  = iconInk{r: 1, g: 1, b: 1}
+	iconInkOnLight = iconInk{r: 0.13, g: 0.14, b: 0.16}
+	iconInkThemed  = iconInk{followTheme: true}
 )
 
+func themeIconInk() iconInk {
+	if themePrefersDark() {
+		return iconInkOnDark
+	}
+	return iconInkOnLight
+}
+
+func (ink iconInk) resolved() iconInk {
+	if ink.followTheme {
+		return themeIconInk()
+	}
+	return ink
+}
+
 func (ink iconInk) apply(cr *cairo.Context) {
-	cr.SetSourceRGB(ink.r, ink.g, ink.b)
+	use := ink.resolved()
+	cr.SetSourceRGB(use.r, use.g, use.b)
 }
 
 func (ink iconInk) onDark() bool {
-	return ink.r > 0.5
+	return ink.resolved().r > 0.5
 }
 
 type iconDraw func(cr *cairo.Context, w, h float64, ink iconInk)
@@ -95,18 +112,38 @@ func arrow(cr *cairo.Context, x, y, dx, dy, size float64) {
 
 func iconPen(cr *cairo.Context, w, h float64, ink iconInk) {
 	ink.apply(cr)
-	x, y, s := iconBox(w, h)
-	cr.MoveTo(x+s*0.18, y+s*0.82)
-	cr.LineTo(x+s*0.72, y+s*0.28)
-	cr.LineTo(x+s*0.84, y+s*0.16)
-	cr.LineTo(x+s*0.62, y+s*0.28)
-	cr.ClosePath()
-	cr.Stroke()
-	cr.MoveTo(x+s*0.18, y+s*0.82)
-	cr.LineTo(x+s*0.32, y+s*0.68)
-	cr.Stroke()
-	cr.Rectangle(x+s*0.12, y+s*0.78, s*0.16, s*0.16)
+	cx, cy := w/2, h/2
+	_, _, s := iconBox(w, h)
+	cr.Save()
+	cr.Translate(cx, cy)
+	cr.Rotate(-0.70)
+	hw := s * 0.11
+	// eraser
+	cr.Rectangle(-s*0.46, -hw, s*0.14, hw*2)
 	cr.Fill()
+	// body, with a gap after the eraser for the ferrule
+	cr.Rectangle(-s*0.28, -hw, s*0.40, hw*2)
+	cr.Fill()
+	cr.Rectangle(s*0.08, -hw, s*0.07, hw*2)
+	cr.Fill()
+	// wood cone
+	cr.MoveTo(s*0.15, -hw)
+	cr.LineTo(s*0.42, 0)
+	cr.LineTo(s*0.15, hw)
+	cr.ClosePath()
+	cr.Fill()
+	// graphite tip
+	if ink.onDark() {
+		cr.SetSourceRGB(0.28, 0.29, 0.32)
+	} else {
+		cr.SetSourceRGB(0.08, 0.08, 0.10)
+	}
+	cr.MoveTo(s*0.32, -hw*0.38)
+	cr.LineTo(s*0.42, 0)
+	cr.LineTo(s*0.32, hw*0.38)
+	cr.ClosePath()
+	cr.Fill()
+	cr.Restore()
 }
 
 func iconArrow(cr *cairo.Context, w, h float64, ink iconInk) {
@@ -176,12 +213,26 @@ func iconBlur(cr *cairo.Context, w, h float64, ink iconInk) {
 func iconSteps(cr *cairo.Context, w, h float64, ink iconInk) {
 	ink.apply(cr)
 	x, y, s := iconBox(w, h)
-	cr.Arc(x+s/2, y+s/2, s*0.46, 0, 2*math.Pi)
+	cx, cy := x+s/2, y+s/2
+	cr.Arc(cx, cy, s*0.46, 0, 2*math.Pi)
+	cr.Fill()
+	if ink.onDark() {
+		cr.SetSourceRGB(0.13, 0.14, 0.16)
+	} else {
+		cr.SetSourceRGB(1, 1, 1)
+	}
+	// Geometric 1, centered on the circle (fonts sit high/left at this size).
+	thick := s * 0.13
+	half := s * 0.20
+	cr.SetLineWidth(thick)
+	cr.SetLineCap(cairo.LineCapRound)
+	cr.SetLineJoin(cairo.LineJoinRound)
+	cr.MoveTo(cx, cy-half)
+	cr.LineTo(cx, cy+half)
 	cr.Stroke()
-	cr.SelectFontFace("sans-serif", cairo.FontSlantNormal, cairo.FontWeightBold)
-	cr.SetFontSize(s * 0.62)
-	cr.MoveTo(x+s*0.32, y+s*0.72)
-	cr.ShowText("1")
+	cr.MoveTo(cx-s*0.11, cy-half+thick*0.35)
+	cr.LineTo(cx, cy-half)
+	cr.Stroke()
 }
 
 func iconText(cr *cairo.Context, w, h float64, ink iconInk) {

@@ -2,17 +2,24 @@ package ui
 
 import "testing"
 
-func TestStrokePreviewGrowsWithWidth(t *testing.T) {
-	_, thin := strokePreviewSize(4)
-	_, mid := strokePreviewSize(24)
-	wide, thick := strokePreviewSize(48)
-	if mid <= thin || thick <= mid {
-		t.Fatalf("preview height should grow with stroke: %d %d %d", thin, mid, thick)
+func TestStrokePreviewStaysFixed(t *testing.T) {
+	thinW, thinH := strokePreviewSize(true, false)
+	thickW, thickH := strokePreviewSize(true, false)
+	if thinW != thickW || thinH != thickH {
+		t.Fatalf("compact preview must not depend on stroke width: %d×%d vs %d×%d", thinW, thinH, thickW, thickH)
 	}
-	if thick < 48 {
-		t.Fatalf("preview height %d should fit a 48px stroke", thick)
+	if thinW != compactPreviewLength || thinH != compactPreviewBreadth {
+		t.Fatalf("compact horizontal preview = %d×%d", thinW, thinH)
 	}
-	if wide <= 48 {
-		t.Fatalf("preview width %d should stay longer than the stroke so it reads as a line", wide)
+	vw, vh := strokePreviewSize(true, true)
+	if vw != verticalPreviewSize || vh != verticalPreviewSize {
+		t.Fatalf("compact vertical preview = %d×%d", vw, vh)
+	}
+	if vw > 32 || vh > 36 {
+		t.Fatalf("vertical preview must not widen the toolbar: %d×%d", vw, vh)
+	}
+	ew, eh := strokePreviewSize(false, false)
+	if ew != editorPreviewLength || eh != editorPreviewBreadth {
+		t.Fatalf("editor preview = %d×%d", ew, eh)
 	}
 }

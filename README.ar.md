@@ -52,21 +52,38 @@
 
 ## لقطات
 
+<div dir="ltr">
 <p align="center">
-  <img src="screenshots/Image1.png" alt="الرئيسية — السجل والمعاينة" width="640" />
+  <img src="screenshots/Home_Light.png" alt="الرئيسية — السجل والمعاينة" width="640" />
 </p>
 
 <p align="center">
-  <img src="screenshots/Image2.png" alt="التحرير — الأدوات والألوان وسمك الخط" width="640" />
+  <img src="screenshots/Annotate_Light.png" alt="التحرير — الأدوات والألوان وسمك الخط" width="640" />
 </p>
 
 <p align="center">
-  <img src="screenshots/Image3.png" alt="شريط أدوات طبقة الالتقاط — الأدوات والألوان وسمك الخط" width="720" />
+  <img src="screenshots/Toolbar.png" alt="شريط أدوات طبقة الالتقاط — الأدوات والألوان وسمك الخط" width="720" />
 </p>
+</div>
 
 <p align="center">
   <sub>الرئيسية · التحرير · شريط الطبقة</sub>
 </p>
+
+<details>
+<summary>السمة الداكنة</summary>
+<div dir="ltr">
+<p align="center">
+  <img src="screenshots/Home_Dark.png" alt="الرئيسية — داكن" width="640" />
+</p>
+<p align="center">
+  <img src="screenshots/Annotate_Dark.png" alt="التحرير — داكن" width="640" />
+</p>
+</div>
+<p align="center">
+  <sub>الرئيسية · التحرير</sub>
+</p>
+</details>
 
 </div>
 

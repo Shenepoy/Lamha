@@ -35,7 +35,7 @@ func Window(ctx context.Context) (string, error) {
 // ViaPortal asks the screenshot portal. Silent requests do not show a picker.
 // Interactive is GNOME's one-time permission path and may show a system dialog.
 func ViaPortal(ctx context.Context, opts portal.ScreenshotOptions) (string, error) {
-	timeout := 20 * time.Second
+	timeout := 5 * time.Second
 	name := "silent portal"
 	if opts.Interactive {
 		timeout = 2 * time.Minute
