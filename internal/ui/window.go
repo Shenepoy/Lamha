@@ -57,6 +57,7 @@ type Window struct {
 	exportedHandle      string
 	exportedTop         *gdkwayland.WaylandToplevel
 	captureTrace        *captureTrace
+	captureWindowPlan   captureWindowPlan
 }
 
 // New builds Lamha's main window and its local capture store.
@@ -356,7 +357,8 @@ func (w *Window) startCapture(mode CaptureMode) {
 
 	w.parkTransientWindows()
 	delay := delayFromIndex(w.delay.Selected())
-	w.restoreAfterCapture = w.window.IsVisible()
+	w.captureWindowPlan = captureWindowPlanFor(w.window.IsVisible())
+	w.restoreAfterCapture = w.captureWindowPlan.restoreMain
 	w.captureTrace = newCaptureTrace()
 	w.setBusy(true, i18n.T("Capturing screen…"))
 	mon := monitorRect(w.window)
@@ -370,10 +372,6 @@ func (w *Window) startCapture(mode CaptureMode) {
 			w.startWindowCapture(ctx, delay, mon)
 		}()
 		return
-	}
-
-	if w.restoreAfterCapture {
-		w.window.Present()
 	}
 
 	go func() {
@@ -390,6 +388,9 @@ func (w *Window) startCapture(mode CaptureMode) {
 				return
 			}
 			timer.Stop()
+		}
+		if w.captureWindowPlan.hideBeforeGrab {
+			w.hideForCapture()
 		}
 
 		w.captureTrace.log("grab", "begin")

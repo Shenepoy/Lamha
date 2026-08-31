@@ -11,6 +11,20 @@ import (
 
 var errCaptureCancelled = errors.New("capture cancelled")
 
+type captureWindowPlan struct {
+	restoreMain      bool
+	hideBeforeGrab   bool
+	dedicatedOverlay bool
+}
+
+func captureWindowPlanFor(mainVisible bool) captureWindowPlan {
+	return captureWindowPlan{
+		restoreMain:      mainVisible,
+		hideBeforeGrab:   mainVisible,
+		dedicatedOverlay: true,
+	}
+}
+
 // CaptureMode is a user-facing capture action.
 type CaptureMode int
 

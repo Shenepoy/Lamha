@@ -11,6 +11,7 @@ import (
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 
 	"github.com/lamha-app/lamha/internal/annotate"
+	"github.com/lamha-app/lamha/internal/brand"
 	"github.com/lamha-app/lamha/internal/grab"
 	"github.com/lamha-app/lamha/internal/i18n"
 	"github.com/lamha-app/lamha/internal/keys"
@@ -131,19 +132,34 @@ func (w *Window) openCaptureOverlayOn(mode CaptureMode, staging string, frames [
 
 func (o *captureOverlay) build() {
 	ensureToolbarCSS()
-	o.window = &o.parent.window.Window
-	o.borrowed = true
-	o.savedChild = o.window.Child()
-	o.savedTitlebar = o.window.Titlebar()
-	o.savedTitle = o.window.Title()
-	o.wasMaximized = o.window.IsMaximized()
-	o.window.SetTitle(i18n.T("Lamha capture"))
-	o.window.AddCSSClass("lamha-capture")
-	if o.savedTitlebar != nil {
-		o.window.SetTitlebar(nil)
+	if o.parent.captureWindowPlan.dedicatedOverlay {
+		o.window = gtk.NewWindow()
+		if app := o.parent.window.Application(); app != nil {
+			o.window.SetApplication(app)
+		}
+		o.window.SetTitle(i18n.T("Lamha capture"))
+		o.window.SetIconName(brand.Name)
+		o.window.SetDecorated(false)
+		o.window.ConnectCloseRequest(func() bool {
+			o.close(true)
+			return true
+		})
+		o.trace.log("build", "create dedicated capture window")
+	} else {
+		o.window = &o.parent.window.Window
+		o.borrowed = true
+		o.savedChild = o.window.Child()
+		o.savedTitlebar = o.window.Titlebar()
+		o.savedTitle = o.window.Title()
+		o.wasMaximized = o.window.IsMaximized()
+		o.window.SetTitle(i18n.T("Lamha capture"))
+		if o.savedTitlebar != nil {
+			o.window.SetTitlebar(nil)
+		}
+		o.trace.log("build", "borrow main window mapped=%v visible=%v child=%v titlebar=%v",
+			o.window.Mapped(), o.window.Visible(), o.savedChild != nil, o.savedTitlebar != nil)
 	}
-	o.trace.log("build", "borrow main window mapped=%v visible=%v child=%v titlebar=%v",
-		o.window.Mapped(), o.window.Visible(), o.savedChild != nil, o.savedTitlebar != nil)
+	o.window.AddCSSClass("lamha-capture")
 
 	keysCtl := gtk.NewEventControllerKey()
 	o.keysCtl = keysCtl

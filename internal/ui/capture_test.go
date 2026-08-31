@@ -42,3 +42,29 @@ func TestDelayFromIndex(t *testing.T) {
 		t.Fatal("delayFromIndex should ignore unknown indexes")
 	}
 }
+
+func TestCaptureWindowPlanWhenMainWindowIsOpen(t *testing.T) {
+	plan := captureWindowPlanFor(true)
+	if !plan.restoreMain {
+		t.Fatal("capture should restore an originally visible main window")
+	}
+	if !plan.hideBeforeGrab {
+		t.Fatal("capture should hide the main window before grabbing the desktop")
+	}
+	if !plan.dedicatedOverlay {
+		t.Fatal("capture should not fullscreen the main application window")
+	}
+}
+
+func TestCaptureWindowPlanWhenMainWindowIsHidden(t *testing.T) {
+	plan := captureWindowPlanFor(false)
+	if plan.restoreMain {
+		t.Fatal("background capture should leave the main window hidden")
+	}
+	if plan.hideBeforeGrab {
+		t.Fatal("background capture should not wait for an already hidden window")
+	}
+	if !plan.dedicatedOverlay {
+		t.Fatal("capture overlay should always use its own window")
+	}
+}
