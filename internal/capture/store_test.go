@@ -2,12 +2,37 @@ package capture
 
 import (
 	"image"
+	"image/color"
 	"image/png"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
+
+func BenchmarkSaveImage4K(b *testing.B) {
+	img := image.NewNRGBA(image.Rect(0, 0, 3840, 2160))
+	for y := 0; y < 2160; y++ {
+		for x := 0; x < 3840; x++ {
+			img.SetNRGBA(x, y, color.NRGBA{
+				R: uint8((x*13 + y*7) & 255),
+				G: uint8((x*3 + y*17) & 255),
+				B: uint8((x*19 + y*5) & 255),
+				A: 255,
+			})
+		}
+	}
+	store, err := NewStore(b.TempDir())
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := store.SaveImage(img); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
 
 func TestSaveURI(t *testing.T) {
 	directory := t.TempDir()
@@ -50,6 +75,9 @@ func TestSaveImage(t *testing.T) {
 	}
 	if filepath.Dir(saved.Path) != store.Directory() {
 		t.Fatalf("SaveImage() directory = %q", filepath.Dir(saved.Path))
+	}
+	if saved.Width != 3 || saved.Height != 3 || saved.Bytes <= 0 {
+		t.Fatalf("SaveImage() metadata = %dx%d, %d bytes", saved.Width, saved.Height, saved.Bytes)
 	}
 	file, err := os.Open(saved.Path)
 	if err != nil {

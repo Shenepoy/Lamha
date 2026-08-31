@@ -133,7 +133,19 @@ func (s *Store) SaveImage(img image.Image) (SavedCapture, error) {
 	if err := WritePNG(destination, img); err != nil {
 		return SavedCapture{}, err
 	}
-	return SavedCapture{Path: destination, URI: fileURI(destination), CreatedAt: createdAt}, nil
+	bytes := int64(0)
+	if info, err := os.Stat(destination); err == nil {
+		bytes = info.Size()
+	}
+	bounds := img.Bounds()
+	return SavedCapture{
+		Path:      destination,
+		URI:       fileURI(destination),
+		CreatedAt: createdAt,
+		Width:     bounds.Dx(),
+		Height:    bounds.Dy(),
+		Bytes:     bytes,
+	}, nil
 }
 
 // WritePNG replaces path with a PNG encoding of img using the same atomic
@@ -150,7 +162,8 @@ func WritePNG(path string, img image.Image) error {
 	temporaryPath := temporary.Name()
 	defer os.Remove(temporaryPath)
 
-	if err := png.Encode(temporary, img); err != nil {
+	encoder := png.Encoder{CompressionLevel: png.BestSpeed}
+	if err := encoder.Encode(temporary, img); err != nil {
 		temporary.Close()
 		return fmt.Errorf("encode annotated capture: %w", err)
 	}

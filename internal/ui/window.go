@@ -31,6 +31,7 @@ type Window struct {
 	delay               *gtk.DropDown
 	history             *gtk.ListBox
 	historyItems        []capture.SavedCapture
+	historyLoaded       bool
 	captureArea         *gtk.Button
 	captureWindow       *gtk.Button
 	captureScreen       *gtk.Button
@@ -73,12 +74,18 @@ func New(application *gtk.Application) (*Window, error) {
 	applyTheme(prefs.Current().Theme())
 	brand.ApplyIconTheme()
 	w.build()
-	w.refreshHistory("")
 	return w, nil
 }
 
 // Present makes the main window visible.
 func (w *Window) Present() {
+	if !w.historyLoaded {
+		selectPath := ""
+		if w.lastCapture != nil {
+			selectPath = w.lastCapture.Path
+		}
+		w.refreshHistory(selectPath)
+	}
 	w.window.Present()
 }
 
@@ -485,6 +492,7 @@ func (w *Window) refreshHistory(selectPath string) {
 		w.status.SetText(i18n.Tf("Could not load capture history: %v", err))
 		return
 	}
+	w.historyLoaded = true
 
 	w.historyItems = items
 	w.history.RemoveAll()
@@ -509,6 +517,18 @@ func (w *Window) refreshHistory(selectPath string) {
 	if row := w.history.RowAtIndex(index); row != nil {
 		w.history.SelectRow(row)
 	}
+}
+
+func (w *Window) prependHistory(saved capture.SavedCapture) {
+	if !w.historyLoaded {
+		return
+	}
+	w.historyItems = append(w.historyItems, capture.SavedCapture{})
+	copy(w.historyItems[1:], w.historyItems[:len(w.historyItems)-1])
+	w.historyItems[0] = saved
+	row := w.newHistoryRow(saved)
+	w.history.Insert(row, 0)
+	w.history.SelectRow(row)
 }
 
 func (w *Window) historySelected(row *gtk.ListBoxRow) {

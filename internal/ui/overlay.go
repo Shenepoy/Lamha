@@ -57,19 +57,19 @@ type captureOverlay struct {
 	lens          *magnifierLens
 	dock          *floatingToolbar
 	statusBox     *gtk.Box
-	frames         []image.Rectangle
-	hovered        image.Rectangle
-	windowLocked   bool
-	borrowed       bool
-	savedChild     gtk.Widgetter
-	savedTitlebar  gtk.Widgetter
-	savedTitle     string
-	wasMaximized   bool
-	keysCtl        *gtk.EventControllerKey
-	trace          *captureTrace
-	loggedDraw     bool
-	stepPop        *stepNumberPop
-	justDragged    bool
+	frames        []image.Rectangle
+	hovered       image.Rectangle
+	windowLocked  bool
+	borrowed      bool
+	savedChild    gtk.Widgetter
+	savedTitlebar gtk.Widgetter
+	savedTitle    string
+	wasMaximized  bool
+	keysCtl       *gtk.EventControllerKey
+	trace         *captureTrace
+	loggedDraw    bool
+	stepPop       *stepNumberPop
+	justDragged   bool
 }
 
 func (w *Window) openCaptureOverlay(mode CaptureMode, staging string, frames []grab.WindowFrame) {
@@ -1003,32 +1003,44 @@ func (o *captureOverlay) hideStepPop() {
 
 func (o *captureOverlay) confirm() {
 	o.commitTyping()
-	rendered := o.doc.Render()
-	if !o.selection.Empty() {
-		rendered = annotate.Crop(rendered, o.selection)
-	}
-	saved, err := o.parent.store.SaveImage(rendered)
-	if err != nil {
-		o.status.SetText(i18n.Tf("Could not save: %s", err.Error()))
-		return
-	}
-	message := i18n.Tf("Saved %s", saved.Path)
-	if o.copyOnSave.Active() {
-		if err := copyImageFile(saved.Path); err != nil {
-			message = i18n.Tf("Saved, but clipboard copy failed: %s", err.Error())
-		} else {
-			message = i18n.T("Saved and copied to the clipboard.")
-		}
-	}
+	rendered := o.doc.RenderRegion(o.selection)
+	copyOnSave := o.copyOnSave.Active()
+	parent := o.parent
 	o.dismiss(func() {
-		o.parent.showCapture(saved, message)
-		o.parent.refreshHistory(saved.Path)
-		if o.parent.restoreAfterCapture {
-			o.parent.Present()
-		} else {
-			o.parent.Notify("Lamha", message)
+		parent.setBusy(true, i18n.T("Saving capture…"))
+		if parent.restoreAfterCapture {
+			parent.Present()
 		}
 	})
+
+	go func() {
+		saved, err := parent.store.SaveImage(rendered)
+		glib.IdleAdd(func() {
+			parent.setBusy(false, "")
+			if err != nil {
+				message := i18n.Tf("Could not save: %s", err.Error())
+				parent.status.SetText(message)
+				if !parent.restoreAfterCapture {
+					parent.Notify("Lamha", message)
+				}
+				return
+			}
+
+			message := i18n.Tf("Saved %s", saved.Path)
+			if copyOnSave {
+				if err := copyImageFile(saved.Path); err != nil {
+					message = i18n.Tf("Saved, but clipboard copy failed: %s", err.Error())
+				} else {
+					message = i18n.T("Saved and copied to the clipboard.")
+				}
+			}
+			parent.showCapture(saved, message)
+			parent.prependHistory(saved)
+			if !parent.restoreAfterCapture {
+				parent.Notify("Lamha", message)
+			}
+		})
+	}()
 }
 
 func (o *captureOverlay) close(cancelled bool) {

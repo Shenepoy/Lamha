@@ -111,6 +111,9 @@ func decodeImage(file *os.File, path string) (image.Image, error) {
 
 func toNRGBA(img image.Image) *image.NRGBA {
 	bounds := img.Bounds()
+	if src, ok := img.(*image.NRGBA); ok && bounds.Min == (image.Point{}) {
+		return src
+	}
 	dst := image.NewNRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
 	draw.Draw(dst, dst.Bounds(), img, bounds.Min, draw.Src)
 	return dst
@@ -142,6 +145,9 @@ func (d *Document) Add(stroke Stroke) {
 	d.strokes = append(d.strokes, stroke)
 	d.redo = nil
 	if d.fresh && d.raster != nil {
+		if d.raster == d.source {
+			d.raster = cloneNRGBA(d.source)
+		}
 		apply(d.raster, stroke)
 		return
 	}
@@ -325,6 +331,11 @@ func (d *Document) Raster() *image.NRGBA {
 	if d.fresh && d.raster != nil {
 		return d.raster
 	}
+	if len(d.strokes) == 0 {
+		d.raster = d.source
+		d.fresh = true
+		return d.raster
+	}
 	d.raster = cloneNRGBA(d.source)
 	for _, stroke := range d.strokes {
 		apply(d.raster, stroke)
@@ -336,6 +347,20 @@ func (d *Document) Raster() *image.NRGBA {
 // Render returns a new image with every stroke applied.
 func (d *Document) Render() *image.NRGBA {
 	return cloneNRGBA(d.Raster())
+}
+
+// RenderRegion returns a selected part of the rendered capture. Unchanged
+// screenshots are cropped directly so area capture does not allocate and copy
+// the full desktop once before copying the selected area again.
+func (d *Document) RenderRegion(region image.Rectangle) *image.NRGBA {
+	region = region.Intersect(d.source.Bounds())
+	if region.Empty() || region.Eq(d.source.Bounds()) {
+		return d.Render()
+	}
+	if len(d.strokes) == 0 {
+		return Crop(d.source, region)
+	}
+	return Crop(d.Render(), region)
 }
 
 // RenderExcept returns a new image with every stroke except skip applied.

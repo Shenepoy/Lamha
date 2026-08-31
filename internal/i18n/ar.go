@@ -105,6 +105,7 @@ var arabicMessages = map[string]string{
 	"5 seconds":                          "5 ثوانٍ",
 	"10 seconds":                         "10 ثوانٍ",
 	"Capturing screen…":                  "جارٍ التقاط الشاشة…",
+	"Saving capture…":                    "جارٍ حفظ اللقطة…",
 	"Requesting screenshot access…":      "جارٍ طلب إذن لقطة الشاشة…",
 	"GNOME needs one-time permission. Allow the system screenshot dialog.": "يحتاج جنوم إذناً لمرة واحدة. اسمح في مربع لقطة الشاشة.",
 	"Could not capture: %v":              "تعذّر الالتقاط: %v",

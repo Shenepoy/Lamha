@@ -3,12 +3,12 @@ package hotkeys
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/diamondburned/gotk4/pkg/gio/v2"
 
 	"github.com/lamha-app/lamha/internal/i18n"
+	"github.com/lamha-app/lamha/internal/launch"
 )
 
 const (
@@ -50,7 +50,7 @@ func InstallGNOME(accels map[string]string) error {
 		return fmt.Errorf("GNOME media-keys schema is not available")
 	}
 
-	exe, err := os.Executable()
+	exe, err := launch.Executable()
 	if err != nil {
 		return fmt.Errorf("resolve lamha binary: %w", err)
 	}

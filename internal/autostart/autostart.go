@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/lamha-app/lamha/internal/launch"
 )
 
 const desktopName = "io.github.lamha.Lamha.desktop"
@@ -45,7 +47,7 @@ func SetEnabled(enabled bool) error {
 		return err
 	}
 
-	exe, err := os.Executable()
+	exe, err := launch.Executable()
 	if err != nil {
 		return fmt.Errorf("resolve lamha binary: %w", err)
 	}

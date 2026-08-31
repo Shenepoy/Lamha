@@ -283,6 +283,32 @@ func TestRenderExceptSkipsStroke(t *testing.T) {
 	}
 }
 
+func TestRasterWithoutStrokesReusesSourceUntilFirstMark(t *testing.T) {
+	doc := solidDoc(20, 20, color.NRGBA{R: 4, G: 5, B: 6, A: 255})
+	if got := doc.Raster(); got != doc.source {
+		t.Fatal("Raster copied an unchanged screenshot")
+	}
+	doc.Add(Stroke{Tool: ToolBox, Color: RGB(0xff0000), Width: 2, X1: 2, Y1: 2, X2: 8, Y2: 8})
+	if got := doc.Raster(); got == doc.source {
+		t.Fatal("Raster mutated the source after adding a mark")
+	}
+	if got := doc.source.NRGBAAt(2, 2); got.R != 4 {
+		t.Fatalf("source pixel was changed: %+v", got)
+	}
+}
+
+func TestRenderRegionWithoutStrokesAvoidsFullFrame(t *testing.T) {
+	doc := solidDoc(100, 80, color.NRGBA{R: 4, G: 5, B: 6, A: 255})
+	doc.source.SetNRGBA(42, 31, color.NRGBA{R: 90, G: 80, B: 70, A: 255})
+	got := doc.RenderRegion(image.Rect(40, 30, 50, 36))
+	if got.Bounds() != image.Rect(0, 0, 10, 6) {
+		t.Fatalf("RenderRegion bounds = %v", got.Bounds())
+	}
+	if pixel := got.NRGBAAt(2, 1); pixel.R != 90 || pixel.G != 80 || pixel.B != 70 {
+		t.Fatalf("RenderRegion pixel = %+v", pixel)
+	}
+}
+
 func TestCrop(t *testing.T) {
 	src := image.NewNRGBA(image.Rect(0, 0, 10, 10))
 	src.SetNRGBA(7, 3, color.NRGBA{R: 12, G: 13, B: 14, A: 255})

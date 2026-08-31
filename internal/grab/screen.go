@@ -114,8 +114,13 @@ func fastBackends() []backend {
 	gnome := []backend{
 		{name: "GNOME Shell", grab: gnomeShellScreenshot},
 	}
-	if _, err := exec.LookPath("gnome-screenshot"); err == nil {
-		gnome = append(gnome, backend{name: "gnome-screenshot", grab: gnomeScreenshotCLI})
+	// On Wayland gnome-screenshot ultimately depends on the same restricted
+	// Shell API and can sit until our timeout. Fall through to the native
+	// screenshot portal instead of paying that delay on every capture.
+	if os.Getenv("WAYLAND_DISPLAY") == "" {
+		if _, err := exec.LookPath("gnome-screenshot"); err == nil {
+			gnome = append(gnome, backend{name: "gnome-screenshot", grab: gnomeScreenshotCLI})
+		}
 	}
 	plasma := []backend{
 		{name: "KWin", grab: kwinScreenshot},
@@ -134,8 +139,10 @@ func windowBackends() []backend {
 	gnome := []backend{
 		{name: "GNOME Shell window", grab: gnomeShellScreenshotWindow},
 	}
-	if _, err := exec.LookPath("gnome-screenshot"); err == nil {
-		gnome = append(gnome, backend{name: "gnome-screenshot window", grab: gnomeScreenshotWindowCLI})
+	if os.Getenv("WAYLAND_DISPLAY") == "" {
+		if _, err := exec.LookPath("gnome-screenshot"); err == nil {
+			gnome = append(gnome, backend{name: "gnome-screenshot window", grab: gnomeScreenshotWindowCLI})
+		}
 	}
 	plasma := []backend{
 		{name: "Spectacle window", grab: spectacleWindowScreenshot},
