@@ -106,8 +106,8 @@ func (i *Item) properties() map[string]dbus.Variant {
 }
 
 type sniTooltip struct {
-	Icon   string
-	Pixmap []brand.Pixmap
+	Icon        string
+	Pixmap      []brand.Pixmap
 	Title       string
 	Description string
 }
@@ -116,18 +116,28 @@ func registerItem(conn *dbus.Conn, name string) error {
 	watchers := []string{watcherKDE, "org.freedesktop.StatusNotifierWatcher"}
 	var last error
 	for _, watcher := range watchers {
-		call := conn.Object(watcher, watcherPath).Call(watcherIface+".RegisterStatusNotifierItem", 0, name)
-		if call.Err == nil {
+		object := conn.Object(watcher, watcherPath)
+		if err := registerStatusNotifierItem(object, name); err == nil {
 			return nil
+		} else {
+			last = err
 		}
-		last = call.Err
-		call = conn.Object(watcher, watcherPath).Call(watcherIface+".RegisterStatusNotifierItem", 0, sniObjectPath)
-		if call.Err == nil {
+		if err := registerStatusNotifierItem(object, string(sniObjectPath)); err == nil {
 			return nil
+		} else {
+			last = err
 		}
-		last = call.Err
 	}
 	return fmt.Errorf("register tray item: %w", last)
+}
+
+type watcherObject interface {
+	Call(method string, flags dbus.Flags, args ...interface{}) *dbus.Call
+}
+
+func registerStatusNotifierItem(object watcherObject, item string) error {
+	call := object.Call(watcherIface+".RegisterStatusNotifierItem", 0, item)
+	return call.Err
 }
 
 type sniProperties struct {
