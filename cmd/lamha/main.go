@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -13,6 +15,7 @@ import (
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 
 	"github.com/lamha-app/lamha/internal/brand"
+	"github.com/lamha-app/lamha/internal/crash"
 	"github.com/lamha-app/lamha/internal/hotkeys"
 	"github.com/lamha-app/lamha/internal/i18n"
 	"github.com/lamha-app/lamha/internal/indicator"
@@ -26,13 +29,40 @@ import (
 const appID = "io.github.lamha.Lamha"
 
 func main() {
+	// Keep os.Exit outside run so crash tracking defers can flush and close.
+	os.Exit(run())
+}
+
+func run() (exitCode int) {
 	if versionRequested(os.Args[1:]) {
 		fmt.Printf("lamha %s\n", version.String())
-		return
+		return 0
 	}
 
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("lamha: ")
+	crashSession, pendingCrash, crashErr := crash.Start(crash.AppInfo{
+		Version: version.String(),
+		PID:     os.Getpid(),
+	})
+	if crashErr != nil && !errors.Is(crashErr, crash.ErrAlreadyRunning) {
+		log.Printf("crash tracking unavailable: %v", crashErr)
+	}
+	if crashSession != nil {
+		log.SetOutput(io.MultiWriter(os.Stderr, crashSession.LogFile()))
+	}
+	defer func() {
+		if value := recover(); value != nil {
+			log.Printf("panic: %v", value)
+			if crashSession != nil {
+				crashSession.RecordPanic(value)
+			}
+			exitCode = 1
+		}
+		if crashSession != nil {
+			_ = crashSession.Close()
+		}
+	}()
 	log.Printf("starting pid=%d", os.Getpid())
 	keys.Load()
 	prefs.Load()
@@ -64,6 +94,7 @@ func main() {
 		servicesStarted  bool
 		held             bool
 		suppressActivate bool
+		crashNoticeShown bool
 	)
 
 	ensureWindow := func() (*ui.Window, error) {
@@ -76,6 +107,30 @@ func main() {
 		}
 		window = created
 		return window, nil
+	}
+
+	showPendingCrash := func(win *ui.Window) {
+		if pendingCrash == nil || crashNoticeShown || win == nil {
+			return
+		}
+		crashNoticeShown = true
+		report := *pendingCrash
+		glib.IdleAdd(func() {
+			win.ShowCrashNotice(report, func() {
+				if crashSession != nil {
+					if err := crashSession.ClearPending(); err != nil {
+						log.Printf("clearing crash report notice: %v", err)
+					}
+				}
+				pendingCrash = nil
+			})
+		})
+	}
+	notifyPendingCrash := func(win *ui.Window) {
+		if pendingCrash == nil || crashNoticeShown || win == nil {
+			return
+		}
+		win.Notify(i18n.T("Lamha stopped unexpectedly"), i18n.T("Open Lamha to review the crash report."))
 	}
 
 	hold := func() {
@@ -94,7 +149,7 @@ func main() {
 		hold()
 
 		if _, err := indicator.Start(&indicator.Host{
-			OnShowWindow:    func() { glib.IdleAdd(func() { win.Present() }) },
+			OnShowWindow:    func() { glib.IdleAdd(func() { win.Present(); showPendingCrash(win) }) },
 			OnCaptureArea:   func() { glib.IdleAdd(func() { win.StartCapture(ui.CaptureArea) }) },
 			OnCaptureWindow: func() { glib.IdleAdd(func() { win.StartWindowPick() }) },
 			OnCaptureScreen: func() { glib.IdleAdd(func() { win.StartCapture(ui.CaptureScreen) }) },
@@ -128,6 +183,7 @@ func main() {
 				return
 			}
 			startServices(win)
+			notifyPendingCrash(win)
 			win.StartCapture(ui.CaptureArea)
 		})
 		addAction("capture-window", func() {
@@ -136,6 +192,7 @@ func main() {
 				return
 			}
 			startServices(win)
+			notifyPendingCrash(win)
 			win.StartCapture(ui.CaptureWindow)
 		})
 		addAction("capture-screen", func() {
@@ -144,6 +201,7 @@ func main() {
 				return
 			}
 			startServices(win)
+			notifyPendingCrash(win)
 			win.StartCapture(ui.CaptureScreen)
 		})
 		addAction("show", func() {
@@ -153,6 +211,7 @@ func main() {
 			}
 			startServices(win)
 			win.Present()
+			showPendingCrash(win)
 		})
 		addAction("quit", func() { app.Quit() })
 	})
@@ -168,6 +227,7 @@ func main() {
 		}
 		startServices(win)
 		win.Present()
+		showPendingCrash(win)
 	})
 
 	app.ConnectCommandLine(func(commandLine *gio.ApplicationCommandLine) int {
@@ -194,19 +254,26 @@ func main() {
 				commandLine.PrinterrLiteral(err.Error() + "\n")
 				return 1
 			}
+			notifyPendingCrash(win)
 			win.StartCapture(mode)
 			return 0
 		}
 
 		if dict != nil && dict.Contains("background") {
+			if pendingCrash != nil {
+				win.Present()
+				showPendingCrash(win)
+			}
 			return 0
 		}
 
 		win.Present()
+		showPendingCrash(win)
 		return 0
 	})
 
-	os.Exit(app.Run(os.Args))
+	exitCode = app.Run(os.Args)
+	return exitCode
 }
 
 func versionRequested(args []string) bool {

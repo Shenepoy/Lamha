@@ -124,6 +124,7 @@ func (w *Window) Notify(title, body string) {
 	note := gio.NewNotification(title)
 	note.SetBody(body)
 	note.SetIcon(gio.NewThemedIcon(brand.Name))
+	note.SetDefaultAction("app.show")
 	if app := w.window.Application(); app != nil {
 		app.SendNotification("lamha", note)
 	}

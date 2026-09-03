@@ -97,6 +97,13 @@ A delay (1–10 seconds) can wait for menus and hover states. The first time on 
 
 Captures land in `$XDG_DATA_HOME/lamha/captures` (usually `~/.local/share/lamha/captures`).
 
+### Crash reports
+
+Lamha keeps a small local log and crash report under `$XDG_STATE_HOME/lamha`
+(usually `~/.local/state/lamha`). If the app exits unexpectedly, the next launch
+shows the report and can open a pre-filled GitHub issue. Nothing is uploaded
+automatically; review the report and remove private details before submitting it.
+
 ---
 
 ## Install
