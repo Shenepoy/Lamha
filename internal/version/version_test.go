@@ -26,3 +26,19 @@ func TestVERSIONFileIsCalVer(t *testing.T) {
 		t.Fatalf("VERSION = %q, want YY.0M.MICRO", name)
 	}
 }
+
+func TestSourceBuildVersionMatchesVERSION(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	root := filepath.Join(filepath.Dir(file), "..", "..")
+	raw, err := os.ReadFile(filepath.Join(root, "VERSION"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.TrimSpace(string(raw))
+	if Version != want {
+		t.Fatalf("source-build Version = %q, VERSION = %q", Version, want)
+	}
+}
