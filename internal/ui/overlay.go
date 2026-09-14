@@ -1044,7 +1044,7 @@ func (o *captureOverlay) confirm() {
 
 			message := i18n.Tf("Saved %s", saved.Path)
 			if copyOnSave {
-				if err := copyImageFile(saved.Path); err != nil {
+				if err := copyImageFileForCapture(saved.Path); err != nil {
 					message = i18n.Tf("Saved, but clipboard copy failed: %s", err.Error())
 				} else {
 					message = i18n.T("Saved and copied to the clipboard.")
