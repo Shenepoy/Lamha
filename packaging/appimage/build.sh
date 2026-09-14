@@ -60,6 +60,12 @@ stamp_desktop() {
 }
 
 cp "$root/bin/lamha" "$appdir/usr/bin/lamha"
+if command -v wl-copy >/dev/null 2>&1; then
+  # Keep Wayland clipboard export self-contained. GTK's regular clipboard
+  # path needs an input serial, while wl-copy's data-control protocol works
+  # for captures started from global shortcuts and hidden windows.
+  cp "$(command -v wl-copy)" "$appdir/usr/bin/wl-copy"
+fi
 stamp_desktop "$appdir/usr/share/applications/io.github.lamha.Lamha.desktop"
 stamp_desktop "$appdir/io.github.lamha.Lamha.desktop"
 cp "$root/data/io.github.lamha.Lamha.metainfo.xml" "$appdir/usr/share/metainfo/io.github.lamha.Lamha.metainfo.xml"
@@ -109,13 +115,18 @@ if [[ ! -x "$custom_apprun" ]]; then
   echo "custom AppRun is missing or not executable: $custom_apprun" >&2
   exit 1
 fi
-"$linuxdeploy" \
-  --appdir "$appdir" \
-  --executable "$appdir/usr/bin/lamha" \
-  --desktop-file "$appdir/usr/share/applications/io.github.lamha.Lamha.desktop" \
-  --icon-file "$appdir/usr/share/icons/hicolor/scalable/apps/io.github.lamha.Lamha.svg" \
-  --custom-apprun "$custom_apprun" \
+linuxdeploy_args=(
+  --appdir "$appdir"
+  --executable "$appdir/usr/bin/lamha"
+  --desktop-file "$appdir/usr/share/applications/io.github.lamha.Lamha.desktop"
+  --icon-file "$appdir/usr/share/icons/hicolor/scalable/apps/io.github.lamha.Lamha.svg"
+  --custom-apprun "$custom_apprun"
   --plugin gtk
+)
+if [[ -x "$appdir/usr/bin/wl-copy" ]]; then
+  linuxdeploy_args+=(--executable "$appdir/usr/bin/wl-copy")
+fi
+"$linuxdeploy" "${linuxdeploy_args[@]}"
 
 # The GTK plugin currently emits an unconditional GDK_BACKEND=x11 hook. Fix
 # that generated hook and include xkeyboard-config before creating the image.

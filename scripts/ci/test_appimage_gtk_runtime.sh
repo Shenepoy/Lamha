@@ -15,6 +15,7 @@ if grep -q 'AppRun\.wrapped' "$custom_apprun"; then
   exit 1
 fi
 grep -q 'exec "\$this_dir/usr/bin/lamha"' "$custom_apprun"
+grep -q 'export PATH="\$this_dir/usr/bin:' "$custom_apprun"
 
 appdir="$fixture/AppDir"
 mkdir -p "$appdir/apprun-hooks" "$appdir/usr/bin" "$fixture/xkb/rules"

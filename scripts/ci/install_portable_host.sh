@@ -12,6 +12,7 @@ sudo apt-get install -y --no-install-recommends \
   file \
   desktop-file-utils \
   xkb-data \
+  wl-clipboard \
   binutils \
   xz-utils \
   bzip2 \

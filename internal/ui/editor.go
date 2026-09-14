@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/diamondburned/gotk4/pkg/cairo"
@@ -860,26 +859,4 @@ func (e *editor) save() {
 	}
 	e.status.SetText(i18n.T("Saved annotated capture."))
 	e.parent.afterAnnotation(e.path, false)
-}
-
-func copyImageFile(path string) error {
-	texture, err := gdk.NewTextureFromFilename(path)
-	if err != nil {
-		return err
-	}
-	display := gdk.DisplayGetDefault()
-	if display == nil {
-		return fmt.Errorf("no display is available for the clipboard")
-	}
-	display.Clipboard().SetTexture(texture)
-	return nil
-}
-
-func copyText(text string) error {
-	display := gdk.DisplayGetDefault()
-	if display == nil {
-		return fmt.Errorf("no display is available for the clipboard")
-	}
-	display.Clipboard().SetText(text)
-	return nil
 }

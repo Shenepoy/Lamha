@@ -4,6 +4,7 @@
 set -e
 
 this_dir="$(readlink -f "$(dirname "$0")")"
+export PATH="$this_dir/usr/bin:${PATH:-}"
 source "$this_dir/apprun-hooks/linuxdeploy-plugin-gtk.sh"
 
 exec "$this_dir/usr/bin/lamha" "$@"

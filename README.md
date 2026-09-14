@@ -118,6 +118,8 @@ Tagged builds publish a Linux binary and an AppImage:
 
 Mark the AppImage executable, then run it. [AppImageUpdate](https://github.com/AppImage/AppImageUpdate) can follow `https://github.com/Zyzto/Lamha/releases/latest`. Versions are calendar versions like Janan: `YY.0M.MICRO` (first August 2026 release is `26.08.0`). Tag `v26.08.0`. The number lives in `VERSION`.
 
+Official AppImages include `wl-copy` for reliable image clipboard export on Wayland. Source installs should install the `wl-clipboard` package when captures are started from a global shortcut or while Lamha is hidden.
+
 ### From source
 
 Install `bin/lamha` on `PATH`, then:

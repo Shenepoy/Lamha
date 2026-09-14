@@ -28,6 +28,12 @@
     <value key="X-AppImage-UpdateInformation">gh-releases-zsync|Zyzto|Lamha|latest|Lamha-*x86_64.AppImage.zsync</value>
   </custom>
   <releases>
+    <release version="26.09.4" date="2026-09-14">
+      <url>https://github.com/Zyzto/Lamha/releases/tag/v26.09.4</url>
+      <description>
+        <p>Make Wayland clipboard export reliable for captures started from shortcuts or while the app is hidden.</p>
+      </description>
+    </release>
     <release version="26.09.3" date="2026-09-14">
       <url>https://github.com/Zyzto/Lamha/releases/tag/v26.09.3</url>
       <description>
