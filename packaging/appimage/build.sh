@@ -70,8 +70,10 @@ cp "$root/data/icons/hicolor/scalable/apps/io.github.lamha.Lamha.svg" \
 
 linuxdeploy="$dist/linuxdeploy-${arch}.AppImage"
 plugin="$dist/linuxdeploy-plugin-gtk.sh"
+appimagetool="$dist/appimagetool-${arch}.AppImage"
 linuxdeploy_url="https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${arch}.AppImage"
 plugin_url="https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh"
+appimagetool_url="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${arch}.AppImage"
 
 if [[ ! -x "$linuxdeploy" ]]; then
   curl -fsSL -o "$linuxdeploy" "$linuxdeploy_url"
@@ -80,6 +82,10 @@ fi
 if [[ ! -x "$plugin" ]]; then
   curl -fsSL -o "$plugin" "$plugin_url"
   chmod +x "$plugin"
+fi
+if [[ ! -x "$appimagetool" ]]; then
+  curl -fsSL -o "$appimagetool" "$appimagetool_url"
+  chmod +x "$appimagetool"
 fi
 
 export APPIMAGE_EXTRACT_AND_RUN=1
@@ -98,27 +104,30 @@ if [[ -n "$gtk4_libdir" ]]; then
 fi
 
 cd "$dist"
+custom_apprun="$root/packaging/appimage/AppRun"
+if [[ ! -x "$custom_apprun" ]]; then
+  echo "custom AppRun is missing or not executable: $custom_apprun" >&2
+  exit 1
+fi
 "$linuxdeploy" \
   --appdir "$appdir" \
   --executable "$appdir/usr/bin/lamha" \
   --desktop-file "$appdir/usr/share/applications/io.github.lamha.Lamha.desktop" \
   --icon-file "$appdir/usr/share/icons/hicolor/scalable/apps/io.github.lamha.Lamha.svg" \
+  --custom-apprun "$custom_apprun" \
   --plugin gtk
 
 # The GTK plugin currently emits an unconditional GDK_BACKEND=x11 hook. Fix
 # that generated hook and include xkeyboard-config before creating the image.
 bash "$root/packaging/appimage/configure_gtk_runtime.sh" "$appdir"
 
-"$linuxdeploy" \
-  --appdir "$appdir" \
-  --output appimage
-
 bundle="$dist/Lamha-${arch}.AppImage"
+rm -f "$bundle"
+APPIMAGE_EXTRACT_AND_RUN=1 "$appimagetool" \
+  --updateinformation "$UPDATE_INFORMATION" \
+  "$appdir" "$bundle"
 if [[ ! -f "$bundle" ]]; then
-  bundle="$(find "$dist" -maxdepth 1 -type f -name '*.AppImage' ! -name 'linuxdeploy*' | head -n 1 || true)"
-fi
-if [[ -z "${bundle}" || ! -f "$bundle" ]]; then
-  echo "linuxdeploy did not write an AppImage under $dist" >&2
+  echo "appimagetool did not write an AppImage under $dist" >&2
   exit 1
 fi
 named="$dist/Lamha-${version}-${arch}.AppImage"

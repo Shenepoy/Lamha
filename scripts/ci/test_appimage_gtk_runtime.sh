@@ -4,9 +4,17 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 patcher="$root/packaging/appimage/configure_gtk_runtime.sh"
+custom_apprun="$root/packaging/appimage/AppRun"
 
 fixture="$(mktemp -d "${TMPDIR:-/tmp}/lamha-gtk-hook-test.XXXXXX")"
 trap 'rm -rf "$fixture"' EXIT
+
+test -x "$custom_apprun"
+if grep -q 'AppRun\.wrapped' "$custom_apprun"; then
+  echo "custom AppRun exposes AppRun.wrapped" >&2
+  exit 1
+fi
+grep -q 'exec "\$this_dir/usr/bin/lamha"' "$custom_apprun"
 
 appdir="$fixture/AppDir"
 mkdir -p "$appdir/apprun-hooks" "$appdir/usr/bin" "$fixture/xkb/rules"

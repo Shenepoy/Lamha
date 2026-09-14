@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Lamha's stable AppImage launcher. Keep the real executable name visible to
+# desktop shells instead of linuxdeploy's generated wrapper name.
+set -e
+
+this_dir="$(readlink -f "$(dirname "$0")")"
+source "$this_dir/apprun-hooks/linuxdeploy-plugin-gtk.sh"
+
+exec "$this_dir/usr/bin/lamha" "$@"
