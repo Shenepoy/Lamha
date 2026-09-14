@@ -33,6 +33,28 @@ if [[ -f "$apprun" ]] && grep -q 'AppRun\.wrapped' "$apprun"; then
   apprun_tmp=""
 fi
 
+# linuxdeploy may keep the custom launcher as AppRun.wrapped while generating
+# a thin AppRun shim. Keep the final launcher self-contained so bundled helper
+# binaries (notably wl-copy) are found before host commands.
+if [[ -f "$apprun" ]] && ! grep -q 'export PATH="\$this_dir/usr/bin:' "$apprun"; then
+  apprun_tmp="$(mktemp "${apprun}.XXXXXX")"
+  trap 'rm -f "${hook_tmp:-}" "${apprun_tmp:-}"' EXIT
+  awk '
+    !inserted && /^this_dir=/ {
+      print
+      print "export PATH=\"$this_dir/usr/bin:${PATH:-}\""
+      inserted = 1
+      next
+    }
+    { print }
+    END { if (!inserted) exit 1 }
+  ' "$apprun" > "$apprun_tmp"
+  chmod --reference="$apprun" "$apprun_tmp"
+  mv -f "$apprun_tmp" "$apprun"
+  apprun_tmp=""
+fi
+rm -f "$appdir/AppRun.wrapped"
+
 # Older linuxdeploy-plugin-gtk releases force X11 because their generated
 # hook does not provide xkeyboard-config data. Remove that override and add a
 # session-aware fallback below. An explicit GDK_BACKEND remains authoritative.
