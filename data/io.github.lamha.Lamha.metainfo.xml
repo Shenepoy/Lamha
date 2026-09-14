@@ -28,6 +28,12 @@
     <value key="X-AppImage-UpdateInformation">gh-releases-zsync|Zyzto|Lamha|latest|Lamha-*x86_64.AppImage.zsync</value>
   </custom>
   <releases>
+    <release version="26.09.2" date="2026-09-14">
+      <url>https://github.com/Zyzto/Lamha/releases/tag/v26.09.2</url>
+      <description>
+        <p>Use a stable Wayland AppImage runtime, keep the Lamha icon and name in desktop shells, and restore the tray item after a StatusNotifier host restart.</p>
+      </description>
+    </release>
     <release version="26.09.1" date="2026-09-03">
       <url>https://github.com/Zyzto/Lamha/releases/tag/v26.09.1</url>
       <description>

@@ -38,6 +38,11 @@ func run() (exitCode int) {
 		fmt.Printf("lamha %s\n", version.String())
 		return 0
 	}
+	// AppImages launch through linuxdeploy's AppRun.wrapped symlink. Set the
+	// GLib names explicitly so desktop shells use Lamha for the window/task
+	// entry instead of exposing that implementation detail.
+	glib.SetPrgname("lamha")
+	glib.SetApplicationName("Lamha")
 
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("lamha: ")
@@ -91,6 +96,7 @@ func run() (exitCode int) {
 
 	var (
 		window           *ui.Window
+		tray             *indicator.Item
 		servicesStarted  bool
 		held             bool
 		suppressActivate bool
@@ -148,14 +154,18 @@ func run() (exitCode int) {
 		servicesStarted = true
 		hold()
 
-		if _, err := indicator.Start(&indicator.Host{
+		var err error
+		tray, err = indicator.Start(&indicator.Host{
 			OnShowWindow:    func() { glib.IdleAdd(func() { win.Present(); showPendingCrash(win) }) },
 			OnCaptureArea:   func() { glib.IdleAdd(func() { win.StartCapture(ui.CaptureArea) }) },
 			OnCaptureWindow: func() { glib.IdleAdd(func() { win.StartWindowPick() }) },
 			OnCaptureScreen: func() { glib.IdleAdd(func() { win.StartCapture(ui.CaptureScreen) }) },
 			OnQuit:          func() { glib.IdleAdd(func() { app.Quit() }) },
-		}); err != nil {
+		})
+		if err != nil {
 			log.Printf("app indicator unavailable: %v", err)
+		} else if tray == nil {
+			log.Printf("app indicator returned no item")
 		}
 
 		if desktopIsGNOME() {

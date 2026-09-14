@@ -11,6 +11,7 @@ sudo apt-get install -y --no-install-recommends \
   ca-certificates \
   file \
   desktop-file-utils \
+  xkb-data \
   binutils \
   xz-utils \
   bzip2 \

@@ -54,6 +54,12 @@ func TestAppImageInfo(t *testing.T) {
 	if !strings.Contains(desktop, "Icon="+Name) {
 		t.Fatalf("desktop file missing Icon=%s", Name)
 	}
+	if !strings.Contains(desktop, "StartupWMClass="+Name) {
+		t.Fatalf("desktop file missing StartupWMClass=%s", Name)
+	}
+	if !strings.Contains(desktop, "X-GNOME-Application-ID="+Name) {
+		t.Fatalf("desktop file missing X-GNOME-Application-ID=%s", Name)
+	}
 
 	if urlType(meta, "homepage") != SourceURL {
 		t.Fatalf("metainfo homepage = %q, want %q", urlType(meta, "homepage"), SourceURL)

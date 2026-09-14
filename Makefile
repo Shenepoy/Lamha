@@ -11,6 +11,7 @@ build:
 
 test:
 	go test ./...
+	bash scripts/ci/test_appimage_gtk_runtime.sh
 
 fmt:
 	gofmt -w cmd internal

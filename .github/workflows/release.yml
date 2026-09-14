@@ -54,6 +54,9 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Test AppImage GTK runtime hook
+        run: bash scripts/ci/test_appimage_gtk_runtime.sh
+
       - name: Build native binary
         env:
           LAMHA_VERSION: ${{ steps.ver.outputs.name }}

@@ -31,9 +31,10 @@ type Host struct {
 
 // Item is a StatusNotifierItem with a DBusMenu context menu.
 type Item struct {
-	host *Host
-	conn *dbus.Conn
-	menu *dbusMenu
+	host        *Host
+	conn        *dbus.Conn
+	menu        *dbusMenu
+	serviceName string
 }
 
 // Start registers a background app indicator.
@@ -45,6 +46,7 @@ func Start(host *Host) (*Item, error) {
 
 	item := &Item{host: host, conn: conn, menu: newDBusMenu(host)}
 	name := fmt.Sprintf("org.kde.StatusNotifierItem-%d-1", os.Getpid())
+	item.serviceName = name
 	reply, err := conn.RequestName(name, dbus.NameFlagDoNotQueue)
 	if err != nil {
 		return nil, fmt.Errorf("claim tray name: %w", err)
@@ -69,9 +71,46 @@ func Start(host *Host) (*Item, error) {
 	if err := registerItem(conn, name); err != nil {
 		return nil, err
 	}
+	item.watchWatcherRestarts()
 
 	log.Printf("app indicator registered as %s", name)
 	return item, nil
+}
+
+// watchWatcherRestarts re-registers the item when GNOME Shell or another
+// StatusNotifier host is restarted. The watcher owns the item registry, so a
+// shell restart otherwise makes a healthy Lamha process silently lose its
+// tray entry.
+func (i *Item) watchWatcherRestarts() {
+	signals := make(chan *dbus.Signal, 8)
+	i.conn.Signal(signals)
+	for _, watcher := range statusNotifierWatchers {
+		if err := i.conn.AddMatchSignal(
+			dbus.WithMatchObjectPath("/org/freedesktop/DBus"),
+			dbus.WithMatchInterface("org.freedesktop.DBus"),
+			dbus.WithMatchMember("NameOwnerChanged"),
+			dbus.WithMatchArg(0, watcher),
+		); err != nil {
+			log.Printf("watching status notifier host %s: %v", watcher, err)
+		}
+	}
+	go func() {
+		defer i.conn.RemoveSignal(signals)
+		for signal := range signals {
+			if len(signal.Body) < 3 {
+				continue
+			}
+			newOwner, ok := signal.Body[2].(string)
+			if !ok || newOwner == "" {
+				continue
+			}
+			if err := registerItem(i.conn, i.serviceName); err != nil {
+				log.Printf("re-registering app indicator: %v", err)
+			} else {
+				log.Printf("app indicator re-registered after status notifier restart")
+			}
+		}
+	}()
 }
 
 func (i *Item) ContextMenu(x, y int32) *dbus.Error { return nil }
@@ -113,7 +152,7 @@ type sniTooltip struct {
 }
 
 func registerItem(conn *dbus.Conn, name string) error {
-	watchers := []string{watcherKDE, "org.freedesktop.StatusNotifierWatcher"}
+	watchers := statusNotifierWatchers
 	var last error
 	for _, watcher := range watchers {
 		object := conn.Object(watcher, watcherPath)
@@ -130,6 +169,8 @@ func registerItem(conn *dbus.Conn, name string) error {
 	}
 	return fmt.Errorf("register tray item: %w", last)
 }
+
+var statusNotifierWatchers = []string{watcherKDE, "org.freedesktop.StatusNotifierWatcher"}
 
 type watcherObject interface {
 	Call(method string, flags dbus.Flags, args ...interface{}) *dbus.Call

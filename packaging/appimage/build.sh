@@ -103,7 +103,14 @@ cd "$dist"
   --executable "$appdir/usr/bin/lamha" \
   --desktop-file "$appdir/usr/share/applications/io.github.lamha.Lamha.desktop" \
   --icon-file "$appdir/usr/share/icons/hicolor/scalable/apps/io.github.lamha.Lamha.svg" \
-  --plugin gtk \
+  --plugin gtk
+
+# The GTK plugin currently emits an unconditional GDK_BACKEND=x11 hook. Fix
+# that generated hook and include xkeyboard-config before creating the image.
+bash "$root/packaging/appimage/configure_gtk_runtime.sh" "$appdir"
+
+"$linuxdeploy" \
+  --appdir "$appdir" \
   --output appimage
 
 bundle="$dist/Lamha-${arch}.AppImage"
