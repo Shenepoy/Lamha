@@ -100,11 +100,16 @@ func copyWithWaylandCLI(data []byte, mimeType string) error {
 
 	command := exec.Command(path, "--type", mimeType)
 	command.Stdin = bytes.NewReader(data)
-	if output, err := command.CombinedOutput(); err != nil {
-		message := strings.TrimSpace(string(output))
-		if message != "" {
-			return fmt.Errorf("run wl-copy: %w (%s)", err, message)
-		}
+	// wl-copy forks a long-lived clipboard owner by default. Do not give the
+	// command a pipe-backed stdout/stderr: the forked owner inherits those
+	// descriptors and CombinedOutput would wait for the owner to exit instead
+	// of returning when the copy request has been accepted.
+	// Leave these nil so os/exec connects them directly to /dev/null. Using
+	// io.Discard would make os/exec create another pipe, which the forked owner
+	// would inherit and keep open as well.
+	command.Stdout = nil
+	command.Stderr = nil
+	if err := command.Run(); err != nil {
 		return fmt.Errorf("run wl-copy: %w", err)
 	}
 	return nil

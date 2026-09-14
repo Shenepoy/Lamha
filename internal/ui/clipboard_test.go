@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCopyWithWaylandCLIForwardsMIMEAndBytes(t *testing.T) {
@@ -46,6 +47,24 @@ func TestCopyWithWaylandCLIMissingCommand(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	if err := copyWithWaylandCLI([]byte("data"), "image/png"); err == nil {
 		t.Fatal("copyWithWaylandCLI() error = nil, want missing command error")
+	}
+}
+
+func TestCopyWithWaylandCLIDoesNotWaitForForkedOwner(t *testing.T) {
+	directory := t.TempDir()
+	commandPath := filepath.Join(directory, "wl-copy")
+	command := "#!/bin/sh\n(sleep 1) &\nexit 0\n"
+	if err := os.WriteFile(commandPath, []byte(command), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	started := time.Now()
+	if err := copyWithWaylandCLI([]byte("data"), "image/png"); err != nil {
+		t.Fatalf("copyWithWaylandCLI() error = %v", err)
+	}
+	if elapsed := time.Since(started); elapsed >= 500*time.Millisecond {
+		t.Fatalf("copyWithWaylandCLI() waited %s for forked owner; want <500ms", elapsed)
 	}
 }
 
